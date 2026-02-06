@@ -1,0 +1,94 @@
+﻿
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "EnhancedInputSubsystemInterface.h"
+#include "GameFramework/PlayerController.h"
+#include "ZXPlayerController.generated.h"
+
+class UUIDelegates;
+class AGridPawn;
+class UInputAction;
+/**
+ * 
+ */
+UCLASS()
+class ZX_API AZXPlayerController : public APlayerController
+{
+	GENERATED_BODY()
+
+public:
+	AZXPlayerController();
+	
+	virtual void BeginPlay() override;
+
+	virtual void OnPossess(APawn* InPawn) override;
+	
+	// Called to bind functionality to input
+	virtual void SetupInputComponent() override;
+	
+	void Move(const FInputActionValue& InActionValue);
+	void FollowGridPawn(const FInputActionValue& InActionValue);
+	void UnfollowGridPawn(const FInputActionValue& InActionValue);
+	void CommandMoveTo(const FInputActionValue& InActionValue);
+
+	/*
+	 * Input: using ue5 new Enhanced input subsystem bc old one is trash.
+	 */
+
+	// Mappings for our main camera pawn:
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputMappingContext* ZXMappingContext;
+
+	// handles move action
+	// Input Actions:
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IAMove;
+	
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IACameraFollow;
+
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IACameraUnfollow;
+	
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IACommandMoveTo;
+
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IACameraZoomIn;
+
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IACameraZoomOut;
+
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomSpeed = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomAmount = 100.f;
+	
+	void OnZoomIn();
+	void OnZoomOut();
+	
+	AGridPawn* GetCameraGridPawn() const;
+	AGridPawn* SetCameraGridPawn(AGridPawn* GPawn);
+
+	UPROPERTY()
+	TObjectPtr<UUIDelegates> UIDelegates;
+	
+protected:
+	UPROPERTY(EditAnywhere, Category = "Command")
+	TEnumAsByte<ETraceTypeQuery> CommandTraceChannel;
+
+	UPROPERTY(EditAnywhere, Category = "Selection")
+	TEnumAsByte<ETraceTypeQuery> SelectionTraceChannel;
+
+	// Cheats:
+	UFUNCTION(Exec)
+	void DebugAttackEveryone();
+	
+private:
+	//Pawn the camera is currently following
+	UPROPERTY()
+	AGridPawn* CameraFollowPawn = nullptr;
+};
