@@ -44,4 +44,7 @@ UCLASS()
 class ZX_API UUIDelegates : public UObject
 {
 	GENERATED_BODY()
+	
+public:
+	FSimpleMulticastDelegate OnMapTriggered;
 };

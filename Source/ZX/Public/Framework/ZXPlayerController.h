@@ -61,14 +61,24 @@ public:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IACameraZoomOut;
 
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IAOpenMap;
+	
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomSpeed = 1.f;
 
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomAmount = 100.f;
 	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomMin = 300.f;
+	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomMax = 1300.f;
+	
 	void OnZoomIn();
 	void OnZoomOut();
+	void OnMapPressed();
 	
 	AGridPawn* GetCameraGridPawn() const;
 	AGridPawn* SetCameraGridPawn(AGridPawn* GPawn);

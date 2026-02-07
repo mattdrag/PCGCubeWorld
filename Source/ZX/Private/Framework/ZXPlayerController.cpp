@@ -71,7 +71,8 @@ void AZXPlayerController::SetupInputComponent()
 	EnhancedInputComp->BindAction(IACommandMoveTo, ETriggerEvent::Completed, this, &ThisClass::CommandMoveTo);
 	EnhancedInputComp->BindAction(IACameraZoomIn, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomIn);
 	EnhancedInputComp->BindAction(IACameraZoomOut, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomOut);
-
+	EnhancedInputComp->BindAction(IAOpenMap, ETriggerEvent::Started,this, &AZXPlayerController::OnMapPressed);
+	
 	// Setup Mappings:
 	EnhancedInputSubsystem->ClearAllMappings();
 	EnhancedInputSubsystem->AddMappingContext(ZXMappingContext, 0);
@@ -133,7 +134,7 @@ void AZXPlayerController::OnZoomIn()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->TargetOrthoWidth -= ZoomAmount;
+		MyCameraManager->SetTargetOrthoWidth(FMath::Clamp(MyCameraManager->GetTargetOrthoWidth() - ZoomAmount, ZoomMin, ZoomMax));
 	}
 }
 
@@ -142,7 +143,15 @@ void AZXPlayerController::OnZoomOut()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->TargetOrthoWidth += ZoomAmount;
+		MyCameraManager->SetTargetOrthoWidth(FMath::Clamp(MyCameraManager->GetTargetOrthoWidth() + ZoomAmount, ZoomMin, ZoomMax));
+	}
+}
+
+void AZXPlayerController::OnMapPressed()
+{
+	if (IsValid(UIDelegates))
+	{
+		UIDelegates->OnMapTriggered.Broadcast();
 	}
 }
 
