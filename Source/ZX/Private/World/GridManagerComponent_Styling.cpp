@@ -73,6 +73,9 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	// Base (dirt):
 	DynCubeMat->SetTextureParameterValue("TopTexture", TileSet->Layer0);
 	DynCubeMat->SetTextureParameterValue("SideTexture", TileSet->Layer0);
+	
+	// Darken based on perlin val:
+	DynCubeMat->SetScalarParameterValue("Darken", InTile->Moisture);
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
