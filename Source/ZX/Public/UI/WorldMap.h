@@ -19,7 +19,16 @@ protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
+	// player presses 'M' or hits the zoom threshold:
 	void HandleMapTriggered();
+	
+	// called when grid manager has finished map gen:
+	void HandleMapGenerationComplete();
+	void GenerateMapTexture();
+	
+	// We hold ptr for texture, uproperty will handle gc:
+	UPROPERTY()
+	TObjectPtr<UTexture2D> MapTexture;
 	
 	UPROPERTY(meta = (BindWidget))
 	const TObjectPtr<UImage> MapImage;
@@ -33,4 +42,7 @@ private:
 	float CurrentDissolve = 1.f;
 	
 	bool bIsMapOpening = false;
+	
+	int32 MapResolution_X = 0;
+	int32 MapResolution_Y = 0;
 };

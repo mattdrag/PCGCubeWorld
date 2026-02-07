@@ -30,6 +30,7 @@ void UGridManagerComponent::BeginPlay()
 void UGridManagerComponent::InitData()
 {
 	GridTiles.Empty();
+	bIsDataGenerated = false;
 
 	SetSeed(GridSeed);
 }
@@ -45,16 +46,22 @@ FGridTile* UGridManagerComponent::GetGridTile(const int32 InIndex)
 	return nullptr;
 }
 
-FGridTile* UGridManagerComponent::GetGridTile(const FIntPoint& InCoordinates)
+FGridTile* UGridManagerComponent::GetGridTile(int32 X, int32 Y)
 {
 	// check grid bounds:
-	if (InCoordinates.X < 0 || InCoordinates.X >= Columns || InCoordinates.Y < 0 || InCoordinates.Y >= Rows)
+	if (X < 0 || X >= Columns || Y < 0 || Y >= Rows)
 	{
 		return nullptr;
 	}
 	
 	// Convert coords to index, then call our other function:
-	return GetGridTile(CoordinatesToIndex(InCoordinates));
+	return GetGridTile(CoordinatesToIndex(X,Y));
+}
+
+FGridTile* UGridManagerComponent::GetGridTile(const FIntPoint& InCoordinates)
+{
+	// break apart FIntPoint:
+	return GetGridTile(InCoordinates.X, InCoordinates.Y);
 }
 
 int32 UGridManagerComponent::CoordinatesToIndex(int32 X, int32 Y) const
@@ -125,7 +132,7 @@ TArray<FGridTile*> UGridManagerComponent::GetGridTilesInRadius(int32 OriginPoint
 	{
 		for (int32 j = -Radius; j < Radius; j++)
 		{
-			if (FGridTile* ThisGridTile = GetGridTile(FIntPoint(OriginCoords.X + i, OriginCoords.Y + j)))
+			if (FGridTile* ThisGridTile = GetGridTile(OriginCoords.X + i, OriginCoords.Y + j))
 			{
 				if (bCheckIfOccupied && ThisGridTile->IsOccupied())
 				{
@@ -288,6 +295,13 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 	if (!GenerateWater())
 	{
 		return false;
+	}
+	
+	// Completed:
+	bIsDataGenerated = true;
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	{
+		UIDelegates->OnMapGenerationComplete.Broadcast();
 	}
 
 	return true;

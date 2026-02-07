@@ -178,3 +178,26 @@ int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FV
 
 	return NumFoliage;
 }
+
+
+FColor UGridManagerComponent::GetColorForTile(int32 InIdx)
+{
+	FGridTile* GridTile = GetGridTile(InIdx);
+	if (GridTile == nullptr)
+	{
+		return FColor::Black;
+	}
+	
+	switch (GridTile->Type) {
+	case ETileType::Grass:
+		return FColor::Green;
+	case ETileType::Dirt:
+		return FColor(124,124, 0);
+	case ETileType::Sand:
+		return FColor(124,124, 0);
+	case ETileType::Water:
+		return FColor::Blue;
+	default:
+		return FColor::Black;
+	}
+}

@@ -46,5 +46,9 @@ class ZX_API UUIDelegates : public UObject
 	GENERATED_BODY()
 	
 public:
+	/*
+	 * Map:
+	 */
+	FSimpleMulticastDelegate OnMapGenerationComplete;
 	FSimpleMulticastDelegate OnMapTriggered;
 };
