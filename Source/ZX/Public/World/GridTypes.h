@@ -45,6 +45,42 @@ enum class ETileType : uint8
 };
 ENUM_RANGE_BY_COUNT(ETileType, ETileType::Count);
 
+USTRUCT(BlueprintType)
+struct FColorRange
+{
+	GENERATED_USTRUCT_BODY()
+	
+	UPROPERTY(EditAnywhere)
+	FColor Lightest;
+	
+	UPROPERTY(EditAnywhere)
+	FColor Base;
+	
+	UPROPERTY(EditAnywhere)
+	FColor Darkest;
+};
+
+USTRUCT(BlueprintType)
+struct FBiomeTileTypeConfig
+{
+	GENERATED_USTRUCT_BODY()
+	
+	// TODO: refactor to work on 2 dims, moisture and altitude. will also determine mountains.
+	// for now, very simple transition between -1 to 1, grass to sand to water.
+	
+	// -1 to sand_thresh
+	UPROPERTY(EditAnywhere)
+	ETileType BaseType = ETileType::Grass;
+	
+	// sand_thresh to water_thresh
+	UPROPERTY(EditAnywhere)
+	float SandThreshold = -0.1f;
+	
+	// water_thresh to 1
+	UPROPERTY(EditAnywhere)
+	float WaterThreshold = 0.f;
+};
+
 /*
 **	Data for a grid tile
 */
@@ -55,8 +91,8 @@ struct FGridTile
 
 	FGridTile() {}
 	
-	FGridTile(ETileType InTileType, float InMoisture, int32 InIdx)
-		: Type(InTileType), Moisture(InMoisture), MyIndex(InIdx)
+	FGridTile(int32 InIdx)
+		: MyIndex(InIdx)
 	{}
 
 	// TODO: occupancy.

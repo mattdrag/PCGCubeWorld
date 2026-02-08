@@ -7,9 +7,10 @@
 #include "World/ZXCube.h"
 
 namespace GridManagerStylingConsts
-{
-	const int32 NumFoliageSlots = 8;
-}
+ {
+ 	constexpr int32 NumFoliageSlots = 8;
+	const FName TestGrasslandsName = "Data.Biome.TestGrasslands";
+ }
 
 void UGridManagerComponent::LoadBiomes()
 {
@@ -36,8 +37,34 @@ void UGridManagerComponent::LoadBiomes()
 	}
 }
 
+ETileType UGridManagerComponent::DetermineTileType(float InMoisture)
+{
+	// TODO: right now we have 1 biome, eventually we want to pass it in as a parameter or something..
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag(GridManagerStylingConsts::TestGrasslandsName));
+	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
+	{
+		LOGZXEF("CurrentBiome configured incorrectly");
+		return ETileType::Grass;
+	}
+	
+	// TODO: biome tile type configs are simple at the moment:
+	const float SandThresh = (*CurrentBiome)->TileTypeConfig.SandThreshold;
+	const float WaterThresh = (*CurrentBiome)->TileTypeConfig.WaterThreshold;
+	if (InMoisture > WaterThresh)
+	{
+		return ETileType::Water;
+	}
+	if (InMoisture > SandThresh)
+	{
+		return ETileType::Dirt; // TODO: make a sand texture.. for now use dirt.
+	}
+	return (*CurrentBiome)->TileTypeConfig.BaseType;
+}
+
 void UGridManagerComponent::StyleCube(AZXCube* InCube)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UGridManagerComponent_StyleCube);
+	
 	if (!IsValid(InCube))
 	{
 		LOGZXEF("null cube..");
@@ -54,7 +81,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	const FIntPoint InCoordinate = IndexToCoordinates(InTile->MyIndex);
 
 	// MD-TODO: current biome:
-	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag("Data.Biome.TestGrasslands"));
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag(GridManagerStylingConsts::TestGrasslandsName));
 	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome) || !IsValid((*CurrentBiome)->TileSet))
 	{
 		LOGZXEF("CurrentBiome configured incorrectly");
@@ -73,9 +100,6 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	// Base (dirt):
 	DynCubeMat->SetTextureParameterValue("TopTexture", TileSet->Layer0);
 	DynCubeMat->SetTextureParameterValue("SideTexture", TileSet->Layer0);
-	
-	// Darken based on perlin val:
-	DynCubeMat->SetScalarParameterValue("Darken", InTile->Moisture);
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
@@ -89,11 +113,13 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Foliage
-		//  - has to pass a moisture check:
-		if (InTile->Moisture > MoistureThresh_FoliageLB)
+		//  - NOTE: since we are styling on 1 dim, lowest moisture will have most foliage:
+		const float FoliageLB = -1.f; // TODO: moisture curve
+		const float FoliageUB = -0.3f; // TODO: moisture curve
+		if (InTile->Moisture < FoliageUB)
 		{
 			TArray<FVector2D> FoliageUVs;
-			GetJitteredGridForTile(InTile, FoliageUVs);
+			GetJitteredGridForTile(InTile, FoliageUVs, FoliageLB, FoliageUB);
 	
 			// we only have so many foliage slots:
 			const int32 NumFoliage = FMath::Clamp(FoliageUVs.Num(), 0, GridManagerStylingConsts::NumFoliageSlots);
@@ -114,6 +140,27 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 				DynCubeMat->SetScalarParameterValue(FName(*FoliageUStr), FoliageUV.X);
 				DynCubeMat->SetScalarParameterValue(FName(*FoliageVStr), FoliageUV.Y);
 			}
+		}
+		
+		// Shade the whole thing based on moisture:
+		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ETileType::Grass))
+		{
+			// grass will go from -1 to sand thresh:
+			const float DarkestGrass = -1.f;
+			const float LightestGrass = (*CurrentBiome)->TileTypeConfig.SandThreshold;
+			const float MidPoint = (DarkestGrass + LightestGrass) / 2;
+			
+			// Transform to linear colors in order to take diff:
+			const bool bDarken = InTile->Moisture < MidPoint;
+			const FLinearColor TargetColor = bDarken ? ColorRange->Darkest : ColorRange->Lightest;
+			const FLinearColor BaseColor = ColorRange->Base;
+			const float Alpha = (InTile->Moisture - MidPoint) / ((bDarken ? DarkestGrass : LightestGrass) - MidPoint) ;
+			const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha); // todo
+
+			// convert grass min -> grass max range to color:
+			FLinearColor ShadingCalc = LerpedColor - BaseColor;
+			DynCubeMat->SetVectorParameterValue("Shading", ShadingCalc);
+			LOGZXEF("Shading=(%f,%f,%f)", ShadingCalc.R, ShadingCalc.G, ShadingCalc.B);
 		}
 	}
 	
@@ -153,7 +200,7 @@ uint8 UGridManagerComponent::Autotile(ETileType InType, const FIntPoint& InCoord
 	return BitmaskToTileStyle[NeighborBitmask];
 }
 
-int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints)
+int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB)
 {
 	// NOTE: we already passed the foliage check.
 	
@@ -164,10 +211,10 @@ int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FV
 	}
 	
 	// we can have between 0-8 foliage. split the range from LB -> UB into 8 discrete thresholds:
-	const float FoliageIncrementInterval = (MoistureThresh_FoliageUB - MoistureThresh_FoliageLB) / 8;
+	const float FoliageIncrementInterval = (FoliageLB - FoliageUB) / 8;
 	
 	// now normalize this tiles moisture against it and LB:
-	const int32 NumFoliage =  (InTile->Moisture - MoistureThresh_FoliageLB) / FoliageIncrementInterval;
+	const int32 NumFoliage =  (InTile->Moisture - FoliageUB) / FoliageIncrementInterval;
 	
 	for (int32 i = 0; i < NumFoliage; i++)
 	{

@@ -59,7 +59,6 @@ public:
 	void FreeCube(const FGridTile& InTile);
 	void MarkCube(int32 InCubeIndex);
 	void CellularAutomataStep();
-	bool GenerateWater();
 	
 	
 	// Places a guy on the grid:
@@ -99,24 +98,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
 	float PerlinScalar = 0.01;
 	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_Grass = 0;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_FoliageLB = 0;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_FoliageUB = 1;
-	
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
 #pragma region Styling 
 	void LoadBiomes();
+	ETileType DetermineTileType(float InMoisture);
 	void StyleCube(AZXCube* InCube);
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 
-	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints);
+	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
 
 	float PerlinNoiseZX(const FVector2D& Location);
 	

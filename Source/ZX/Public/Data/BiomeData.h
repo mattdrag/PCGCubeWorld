@@ -4,6 +4,7 @@
 
 #include "Core/ZX.h"
 #include "ZXPrimaryDataAsset.h"
+#include "World/GridTypes.h"
 #include "BiomeData.generated.h"
 
 class UTileSetData;
@@ -32,6 +33,12 @@ public:
 	// Sprite Foliage - in world sprites stood upright:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
 	TArray<UTexture*> Foliage;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
+	FBiomeTileTypeConfig TileTypeConfig;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
+	TMap<ETileType, FColorRange> TileColorRanges;
 	
 	/**
 	 * Meta  - Include with every new Data Asset

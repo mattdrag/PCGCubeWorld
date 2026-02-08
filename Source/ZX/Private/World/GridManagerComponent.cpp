@@ -171,11 +171,12 @@ bool UGridManagerComponent::GenerateGridData()
 		{
 			// Init with our current seed:
 			FMath::RandInit(GridRandom.GetCurrentSeed());
-
-			// Perlin noise:
-			const float MoistureVal = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
-			const ETileType RandomType = MoistureVal >= MoistureThresh_Grass ? ETileType::Grass : ETileType::Dirt;
-			GridTiles.Add(FGridTile(RandomType, MoistureVal, i * Columns + j));
+			
+			// Make a tile:
+			FGridTile NewTile(i * Columns + j);
+			NewTile.Moisture = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
+			NewTile.Type = DetermineTileType(NewTile.Moisture);
+			GridTiles.Add(NewTile);
 		}
 	}
 
@@ -239,20 +240,6 @@ void UGridManagerComponent::CellularAutomataStep()
 	}
 }
 
-bool UGridManagerComponent::GenerateWater()
-{
-	for (FGridTile& GridTile : GridTiles)
-	{
-		// Dirt becomes water:
-		if (GridTile.Type == ETileType::Dirt)
-		{
-			GridTile.Type = ETileType::Water;
-		}
-	}
-	
-	return true;
-}
-
 bool UGridManagerComponent::DestroyGrid()
 {
 	// destroy cubes:
@@ -291,12 +278,7 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 		CellularAutomataStep();
 	}
 	
-	// 3. Water:
-	if (!GenerateWater())
-	{
-		return false;
-	}
-	
+
 	// Completed:
 	bIsDataGenerated = true;
 	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
