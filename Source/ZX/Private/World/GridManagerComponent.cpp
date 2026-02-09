@@ -174,8 +174,8 @@ bool UGridManagerComponent::GenerateGridData()
 			
 			// Make a tile:
 			FGridTile NewTile(i * Columns + j);
-			NewTile.Moisture = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
-			NewTile.Type = DetermineTileType(NewTile.Moisture);
+			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
+			NewTile.Type = DetermineTileType(NewTile.Altitude);
 			GridTiles.Add(NewTile);
 		}
 	}

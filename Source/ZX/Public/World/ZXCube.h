@@ -17,7 +17,7 @@ enum class ECubeDebugTextMode : uint8
 	Index,
 	Coordinate,
 	TileType,
-	Moisture
+	Altitude
 };
 
 UCLASS()

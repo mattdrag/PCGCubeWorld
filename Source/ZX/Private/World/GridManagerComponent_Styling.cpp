@@ -37,7 +37,7 @@ void UGridManagerComponent::LoadBiomes()
 	}
 }
 
-ETileType UGridManagerComponent::DetermineTileType(float InMoisture)
+ETileType UGridManagerComponent::DetermineTileType(float InAltitude)
 {
 	// TODO: right now we have 1 biome, eventually we want to pass it in as a parameter or something..
 	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag(GridManagerStylingConsts::TestGrasslandsName));
@@ -50,11 +50,11 @@ ETileType UGridManagerComponent::DetermineTileType(float InMoisture)
 	// TODO: biome tile type configs are simple at the moment:
 	const float SandThresh = (*CurrentBiome)->TileTypeConfig.SandThreshold;
 	const float WaterThresh = (*CurrentBiome)->TileTypeConfig.WaterThreshold;
-	if (InMoisture > WaterThresh)
+	if (InAltitude > WaterThresh)
 	{
 		return ETileType::Water;
 	}
-	if (InMoisture > SandThresh)
+	if (InAltitude > SandThresh)
 	{
 		return ETileType::Sand;
 	}
@@ -97,16 +97,16 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		return;
 	}
 	
-	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Moisture)
+	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Altitude)
 	{
 		// grass will go from -1 to sand thresh:
 		const float MidPoint = (DarkestVal + LightestVal) / 2;
 			
 		// Transform to linear colors in order to take diff:
-		const bool bDarken = Moisture < MidPoint;
+		const bool bDarken = Altitude < MidPoint;
 		const FLinearColor TargetColor = bDarken ? ColorRange.Darkest : ColorRange.Lightest;
 		const FLinearColor BaseColor = ColorRange.Base;
-		const float Alpha = (Moisture - MidPoint) / ((bDarken ? DarkestVal : LightestVal) - MidPoint) ;
+		const float Alpha = (Altitude - MidPoint) / ((bDarken ? DarkestVal : LightestVal) - MidPoint) ;
 		const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha);
 
 		// shading is additive, so we actually want the diff:
@@ -120,7 +120,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	// Dirt shading:
 	if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ETileType::Sand))
 	{
-		DynCubeMat->SetVectorParameterValue("DirtShading", CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile->Moisture));
+		DynCubeMat->SetVectorParameterValue("DirtShading", CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile->Altitude));
 	}
 
 	// Grass:
@@ -135,10 +135,10 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Foliage
-		//  - NOTE: since we are styling on 1 dim, lowest moisture will have most foliage:
-		const float FoliageLB = -1.f; // TODO: moisture curve
-		const float FoliageUB = -0.3f; // TODO: moisture curve
-		if (InTile->Moisture < FoliageUB)
+		//  - NOTE: since we are styling on 1 dim, highes Altitude will have most foliage for now:
+		const float FoliageLB = -1.f; // TODO: altitude curve
+		const float FoliageUB = -0.3f;
+		if (InTile->Altitude < FoliageUB)
 		{
 			TArray<FVector2D> FoliageUVs;
 			GetJitteredGridForTile(InTile, FoliageUVs, FoliageLB, FoliageUB);
@@ -167,7 +167,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		// Grass shading:
 		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
 		{
-			DynCubeMat->SetVectorParameterValue("Shading", CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile->Moisture));
+			DynCubeMat->SetVectorParameterValue("Shading", CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile->Altitude));
 		}
 	}
 	
@@ -184,7 +184,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		// Water gets shaded:
 		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
 		{
-			auto WaterShading = CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile->Moisture);
+			auto WaterShading = CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile->Altitude);
 			DynCubeMat->SetVectorParameterValue("Shading", WaterShading);
 			LOGZXWF("WaterShading=(%f,%f,%f)", WaterShading.R, WaterShading.G, WaterShading.B);
 		}
@@ -242,8 +242,8 @@ int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FV
 	// we can have between 0-8 foliage. split the range from LB -> UB into 8 discrete thresholds:
 	const float FoliageIncrementInterval = (FoliageLB - FoliageUB) / 8;
 	
-	// now normalize this tiles moisture against it and LB:
-	const int32 NumFoliage =  (InTile->Moisture - FoliageUB) / FoliageIncrementInterval;
+	// now normalize this tiles altitude against it and LB:
+	const int32 NumFoliage =  (InTile->Altitude - FoliageUB) / FoliageIncrementInterval;
 	
 	for (int32 i = 0; i < NumFoliage; i++)
 	{

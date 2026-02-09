@@ -103,7 +103,7 @@ protected:
 	
 #pragma region Styling 
 	void LoadBiomes();
-	ETileType DetermineTileType(float InMoisture);
+	ETileType DetermineTileType(float InAltitude);
 	void StyleCube(AZXCube* InCube);
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);

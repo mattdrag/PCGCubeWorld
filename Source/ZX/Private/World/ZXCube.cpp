@@ -71,12 +71,12 @@ void AZXCube::ToggleGridDebugText(uint8 Mode)
 			}
 		}
 		break;
-	case ECubeDebugTextMode::Moisture:
+	case ECubeDebugTextMode::Altitude:
 		if (UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this))
 		{
 			if (FGridTile* MyGridTile = GridManager->GetGridTile(MyGridTileIdx))
 			{
-				GridIndexDebugText->SetText(FText::AsNumber(MyGridTile->Moisture));
+				GridIndexDebugText->SetText(FText::AsNumber(MyGridTile->Altitude));
 			}
 		}
 		break;

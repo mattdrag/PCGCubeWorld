@@ -102,9 +102,9 @@ struct FGridTile
 	UPROPERTY(BlueprintReadOnly)
 	ETileType Type = ETileType::Grass;
 	
-	// Moisture:
+	// Altitude:
 	UPROPERTY(BlueprintReadOnly)
-	float Moisture = -1.f;
+	float Altitude = -1.f;
 	
 	// -1 means uninitialized:
 	UPROPERTY(BlueprintReadOnly)
