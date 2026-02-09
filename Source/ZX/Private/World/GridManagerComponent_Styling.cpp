@@ -1,6 +1,5 @@
 ﻿#include "Core/ZXUtils.h"
 #include "Data/BiomeData.h"
-#include "Data/TileSetData.h"
 #include "Data/ZXAssetManager.h"
 #include "World/GridTypes.h"
 #include "World/GridManagerComponent.h"
@@ -81,12 +80,11 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	
 	// Get biome from tile:
 	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InTile->Biome);
-	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome) || !IsValid((*CurrentBiome)->TileSet))
+	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
 	{
 		LOGZXEF("CurrentBiome configured incorrectly");
 		return;
 	}
-	UTileSetData* TileSet = (*CurrentBiome)->TileSet;
 	
 	// make sure it has a material we can style:
 	UMaterialInstanceDynamic* DynCubeMat = InCube->GetDynamicMaterial(InTile->Type);
@@ -98,10 +96,9 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	
 	// Base is either dirt or sand. if there are any adjacent sand tiles, it becomes sand.
 	const bool bIsSand = HasAnyNeighborsOfType(ETileType::Sand, InCoordinate);
-	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
-	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
-	// Dirt shading:
-	DynCubeMat->SetVectorParameterValue("DirtShading", GetColorForTile(**CurrentBiome, ETileType::Sand, InTile->Altitude));
+	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? (*CurrentBiome)->Sand : (*CurrentBiome)->Dirt);
+	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? (*CurrentBiome)->Sand : (*CurrentBiome)->Dirt);
+	DynCubeMat->SetVectorParameterValue("BaseShade", GetColorForTile(**CurrentBiome, ETileType::Sand, InTile->Altitude));
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
@@ -109,9 +106,9 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		const uint8 TileSheetIndex = Autotile(ETileType::Grass, InCoordinate);
 	
 		// Top:
-		if (TileSet->Layer1.IsValidIndex(TileSheetIndex))
+		if ((*CurrentBiome)->Grass.IsValidIndex(TileSheetIndex))
 		{
-			DynCubeMat->SetTextureParameterValue("GrassTexture", TileSet->Layer1[TileSheetIndex]);
+			DynCubeMat->SetTextureParameterValue("GrassTexture", (*CurrentBiome)->Grass[TileSheetIndex]);
 		}
 		
 		// Foliage
@@ -132,20 +129,20 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 				const FVector2D& FoliageUV = FoliageUVs[i];
 		
 				// TODO: get random weighted index
-				const int32 FoliageIdx = FMath::RandRange(0, TileSet->Layer2.Num() - 1);
+				const int32 FoliageIdx = FMath::RandRange(0, (*CurrentBiome)->Foliage.Num() - 1);
 		
 				// Set material params:
 				const FString FoliageStr = FString::Printf(TEXT("Foliage%d"), i);
 				const FString FoliageUStr = FString::Printf(TEXT("Foliage%dU"), i);
 				const FString FoliageVStr = FString::Printf(TEXT("Foliage%dV"), i);
-				DynCubeMat->SetTextureParameterValue(FName(*FoliageStr), TileSet->Layer2[FoliageIdx]);
+				DynCubeMat->SetTextureParameterValue(FName(*FoliageStr), (*CurrentBiome)->Foliage[FoliageIdx]);
 				DynCubeMat->SetScalarParameterValue(FName(*FoliageUStr), FoliageUV.X);
 				DynCubeMat->SetScalarParameterValue(FName(*FoliageVStr), FoliageUV.Y);
 			}
 		}
 		
 		// Grass shading:
-		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(**CurrentBiome, ETileType::Grass, InTile->Altitude));
+		DynCubeMat->SetVectorParameterValue("GrassShade", GetColorForTile(**CurrentBiome, ETileType::Grass, InTile->Altitude));
 	}
 	
 	// Water:
@@ -153,13 +150,13 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	{
 		const uint8 TileSheetIndex = Autotile(ETileType::Water, InCoordinate);
 		
-		if (TileSet->Water.IsValidIndex(TileSheetIndex))
+		if ((*CurrentBiome)->Water.IsValidIndex(TileSheetIndex))
 		{
-			DynCubeMat->SetTextureParameterValue("WaterTexture", TileSet->Water[TileSheetIndex]);
+			DynCubeMat->SetTextureParameterValue("WaterTexture", (*CurrentBiome)->Water[TileSheetIndex]);
 		}
 		
 		// Water gets shaded:
-		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(**CurrentBiome, ETileType::Water, InTile->Altitude));
+		DynCubeMat->SetVectorParameterValue("WaterShade", GetColorForTile(**CurrentBiome, ETileType::Water, InTile->Altitude));
 	}
 }
 

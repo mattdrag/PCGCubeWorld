@@ -26,19 +26,31 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = General)
 	FText DisplayName;
 
-	// Tile Set:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
-	UTileSetData* TileSet;
-
-	// Sprite Foliage - in world sprites stood upright:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
-	TArray<UTexture*> Foliage;
 	
+	// Tile Set:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TObjectPtr<UTexture> Dirt;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TObjectPtr<UTexture> Sand;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TArray<UTexture*> Grass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TArray<UTexture*> Foliage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TArray<UTexture*> Water;
+
+	
+	// Styling:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
 	FBiomeTileTypeConfig TileTypeConfig;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
 	TMap<ETileType, FColorRange> TileColorRanges;
+	
 	
 	/**
 	 * Meta  - Include with every new Data Asset
