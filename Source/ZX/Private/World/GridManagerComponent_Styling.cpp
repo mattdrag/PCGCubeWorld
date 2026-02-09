@@ -56,7 +56,7 @@ ETileType UGridManagerComponent::DetermineTileType(float InMoisture)
 	}
 	if (InMoisture > SandThresh)
 	{
-		return ETileType::Dirt; // TODO: make a sand texture.. for now use dirt.
+		return ETileType::Sand;
 	}
 	return (*CurrentBiome)->TileTypeConfig.BaseType;
 }
@@ -114,10 +114,14 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	};
 	
 	// Base is either dirt or sand. if there are any adjacent sand tiles, it becomes sand.
-	//const bool bIsSand = HasAnyNeighborsOfType(ETileType::Sand, InCoordinate);
-	const bool bIsSand = InTile->Moisture > (*CurrentBiome)->TileTypeConfig.SandThreshold;
+	const bool bIsSand = HasAnyNeighborsOfType(ETileType::Sand, InCoordinate);
 	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
+	// Dirt shading:
+	if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ETileType::Sand))
+	{
+		DynCubeMat->SetVectorParameterValue("DirtShading", CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile->Moisture));
+	}
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
