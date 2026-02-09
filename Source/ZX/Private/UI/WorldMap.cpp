@@ -3,6 +3,7 @@
 
 #include "UI/WorldMap.h"
 
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/Image.h"
 #include "Core/ZXUtils.h"
 #include "World/GridManagerComponent.h"
@@ -17,6 +18,19 @@ void UWorldMap::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	
+	// listen for viewport size changes:
+	if (UWorld* World = GetWorld())
+	{
+		if (UGameViewportClient* ViewportClient = World->GetGameViewport())
+		{
+			if (ViewportClient->Viewport != nullptr)
+			{
+				ViewportClient->Viewport->ViewportResizedEvent.AddUObject(this, &ThisClass::OnViewportResized);	
+			}
+		}
+	}
+	
+	// bind a couple of our own delegate:
 	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
 	{
 		UIDelegates->OnMapTriggered.AddUObject(this, &ThisClass::HandleMapTriggered);
@@ -39,6 +53,29 @@ void UWorldMap::NativeOnInitialized()
 			HandleMapGenerationComplete();
 		}
 	}
+}
+
+void UWorldMap::NativeDestruct()
+{
+	// cleanup delegates:
+	if (UWorld* World = GetWorld())
+	{
+		if (UGameViewportClient* ViewportClient = World->GetGameViewport())
+		{
+			if (ViewportClient->Viewport != nullptr)
+			{
+				ViewportClient->Viewport->ViewportResizedEvent.RemoveAll(this);	
+			}
+		}
+	}
+	
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	{
+		UIDelegates->OnMapTriggered.RemoveAll(this);
+		UIDelegates->OnMapGenerationComplete.RemoveAll(this);
+	}
+	
+	Super::NativeDestruct();
 }
 
 void UWorldMap::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -76,6 +113,7 @@ void UWorldMap::HandleMapTriggered()
 	{
 		SetVisibility(ESlateVisibility::Visible);
 	}
+	//MapMaterial->SetScalarParameterValue("ScaleUV", 5);
 }
 
 void UWorldMap::HandleMapGenerationComplete()
@@ -88,6 +126,10 @@ void UWorldMap::HandleMapGenerationComplete()
 	{
 		MapMaterial->SetTextureParameterValue("MapTexture", MapTexture);
 	}
+	
+	// set map scale and UV scale:
+	ZoomAmount = InitialZoom;
+	UpdateMapDimensions();
 }
 
 void UWorldMap::GenerateMapTexture()
@@ -138,7 +180,7 @@ void UWorldMap::GenerateMapTexture()
 			const FColor PixelColor = GridManager->GetColorForMapTile(GridManager->CoordinatesToIndex(x,y));
 			
 			// NOTE: we are kinda just writing data off the end of a ptr but we just have to trust Epic on this one..
-			int32 Index = ((y * MapResolution_X) + x) * 4;
+			const int32 Index = ((y * MapResolution_X) + x) * 4;
 			TextureData[Index]     = PixelColor.B;   // Blue
 			TextureData[Index + 1] = PixelColor.G;   // Green
 			TextureData[Index + 2] = PixelColor.R; // Red
@@ -149,4 +191,32 @@ void UWorldMap::GenerateMapTexture()
 	// final resource update:
 	Mip.BulkData.Unlock();
 	MapTexture->UpdateResource();
+}
+
+void UWorldMap::OnViewportResized(FViewport* Viewport, uint32 UnusedInt)
+{
+	// just wrap UpdateMapDimensions for now..
+	UpdateMapDimensions();
+}
+
+void UWorldMap::UpdateMapDimensions()
+{
+	// using the major axis of the viewport, calc how much we need to scale the map image:
+	const FVector2D ViewportSize = UWidgetLayoutLibrary::GetViewportSize(this);
+	if (ViewportSize.X == 0.f || ViewportSize.Y == 0.f)
+	{
+		LOGZXEF("invalid viewport size..");
+		return;
+	}
+	
+	// scale map image:
+	MapImageScale = ViewportSize.X > ViewportSize.Y ? ViewportSize.X / ViewportSize.Y : ViewportSize.Y / ViewportSize.X;
+	MapImage->SetRenderScale(FVector2D(MapImageScale, MapImageScale));
+	
+	// the rest goes into the UVs:
+	UVScale = ZoomAmount - MapImageScale;
+	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	{
+		MapMaterial->SetScalarParameterValue("ScaleUV", UVScale);
+	}
 }

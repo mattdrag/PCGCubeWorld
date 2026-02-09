@@ -17,6 +17,7 @@ class ZX_API UWorldMap : public UUserWidget
 	
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
 	// player presses 'M' or hits the zoom threshold:
@@ -26,12 +27,19 @@ protected:
 	void HandleMapGenerationComplete();
 	void GenerateMapTexture();
 	
+	// recalc dimensions whenever screen resolution changes:
+	void UpdateMapDimensions();
+	void OnViewportResized(FViewport* Viewport, uint32 UnusedInt);
+	
 	// We hold ptr for texture, uproperty will handle gc:
 	UPROPERTY()
 	TObjectPtr<UTexture2D> MapTexture;
 	
 	UPROPERTY(meta = (BindWidget))
 	const TObjectPtr<UImage> MapImage;
+	
+	UPROPERTY(EditDefaultsOnly)
+	float InitialZoom = 10.f;
 	
 	UPROPERTY(EditDefaultsOnly)
 	float DissolveSpeed = 0.5f;
@@ -45,4 +53,8 @@ private:
 	
 	int32 MapResolution_X = 0;
 	int32 MapResolution_Y = 0;
+	
+	float ZoomAmount = 10.f;
+	float MapImageScale = 1.f;
+	float UVScale = 1.f;
 };
