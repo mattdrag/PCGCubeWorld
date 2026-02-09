@@ -97,9 +97,27 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		return;
 	}
 	
-	// Base (dirt):
-	DynCubeMat->SetTextureParameterValue("TopTexture", TileSet->Layer0);
-	DynCubeMat->SetTextureParameterValue("SideTexture", TileSet->Layer0);
+	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Moisture)
+	{
+		// grass will go from -1 to sand thresh:
+		const float MidPoint = (DarkestVal + LightestVal) / 2;
+			
+		// Transform to linear colors in order to take diff:
+		const bool bDarken = Moisture < MidPoint;
+		const FLinearColor TargetColor = bDarken ? ColorRange.Darkest : ColorRange.Lightest;
+		const FLinearColor BaseColor = ColorRange.Base;
+		const float Alpha = (Moisture - MidPoint) / ((bDarken ? DarkestVal : LightestVal) - MidPoint) ;
+		const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha);
+
+		// shading is additive, so we actually want the diff:
+		return LerpedColor - BaseColor;
+	};
+	
+	// Base is either dirt or sand. if there are any adjacent sand tiles, it becomes sand.
+	//const bool bIsSand = HasAnyNeighborsOfType(ETileType::Sand, InCoordinate);
+	const bool bIsSand = InTile->Moisture > (*CurrentBiome)->TileTypeConfig.SandThreshold;
+	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
+	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
@@ -142,25 +160,10 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 			}
 		}
 		
-		// Shade the whole thing based on moisture:
-		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ETileType::Grass))
+		// Grass shading:
+		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
 		{
-			// grass will go from -1 to sand thresh:
-			const float DarkestGrass = -1.f;
-			const float LightestGrass = (*CurrentBiome)->TileTypeConfig.SandThreshold;
-			const float MidPoint = (DarkestGrass + LightestGrass) / 2;
-			
-			// Transform to linear colors in order to take diff:
-			const bool bDarken = InTile->Moisture < MidPoint;
-			const FLinearColor TargetColor = bDarken ? ColorRange->Darkest : ColorRange->Lightest;
-			const FLinearColor BaseColor = ColorRange->Base;
-			const float Alpha = (InTile->Moisture - MidPoint) / ((bDarken ? DarkestGrass : LightestGrass) - MidPoint) ;
-			const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha); // todo
-
-			// convert grass min -> grass max range to color:
-			FLinearColor ShadingCalc = LerpedColor - BaseColor;
-			DynCubeMat->SetVectorParameterValue("Shading", ShadingCalc);
-			LOGZXEF("Shading=(%f,%f,%f)", ShadingCalc.R, ShadingCalc.G, ShadingCalc.B);
+			DynCubeMat->SetVectorParameterValue("Shading", CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile->Moisture));
 		}
 	}
 	
@@ -172,6 +175,14 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		if (TileSet->Water.IsValidIndex(TileSheetIndex))
 		{
 			DynCubeMat->SetTextureParameterValue("WaterTexture", TileSet->Water[TileSheetIndex]);
+		}
+		
+		// Water gets shaded:
+		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
+		{
+			auto WaterShading = CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile->Moisture);
+			DynCubeMat->SetVectorParameterValue("Shading", WaterShading);
+			LOGZXWF("WaterShading=(%f,%f,%f)", WaterShading.R, WaterShading.G, WaterShading.B);
 		}
 	}
 }
@@ -198,6 +209,20 @@ uint8 UGridManagerComponent::Autotile(ETileType InType, const FIntPoint& InCoord
 		return 0;
 	}
 	return BitmaskToTileStyle[NeighborBitmask];
+}
+
+bool UGridManagerComponent::HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord)
+{
+	for (const FIntPoint& Neighbor : GridTypesConsts::NeighborArray)
+	{
+		const FIntPoint NeighborCoordinate = InCoord + Neighbor;
+		const FGridTile* NeighborTile = GetGridTile(NeighborCoordinate);
+		if (NeighborTile != nullptr && NeighborTile->Type == InType)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB)

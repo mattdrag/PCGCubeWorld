@@ -8,7 +8,6 @@
 
 /**
  * A tile set is everything that is used as a part of the material that makes up the cube.
- * - Layer0 - base layers that are available, like dirt, sand, water, etc
  * - Layer1 - the tile set, should be a set of 47
  * - Layer2 - static detailing on top to be sampled for procgen, like foliage
  */
@@ -25,7 +24,10 @@ public:
 	FGameplayTag GameplayTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
-	TObjectPtr<UTexture> Layer0;
+	TObjectPtr<UTexture> Dirt;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
+	TObjectPtr<UTexture> Sand;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
 	TArray<UTexture*> Layer1;

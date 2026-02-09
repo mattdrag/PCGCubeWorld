@@ -106,6 +106,7 @@ protected:
 	ETileType DetermineTileType(float InMoisture);
 	void StyleCube(AZXCube* InCube);
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
+	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
 	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
 
