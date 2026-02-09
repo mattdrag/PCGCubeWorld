@@ -101,7 +101,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 	// Dirt shading:
-	DynCubeMat->SetVectorParameterValue("DirtShading", GetColorForTile(*InTile, ETileType::Sand));
+	DynCubeMat->SetVectorParameterValue("DirtShading", GetColorForTile(**CurrentBiome, ETileType::Sand, InTile->Altitude));
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
@@ -145,7 +145,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Grass shading:
-		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(*InTile));
+		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(**CurrentBiome, ETileType::Grass, InTile->Altitude));
 	}
 	
 	// Water:
@@ -159,7 +159,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Water gets shaded:
-		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(*InTile));
+		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(**CurrentBiome, ETileType::Water, InTile->Altitude));
 	}
 }
 
@@ -242,35 +242,21 @@ FColor UGridManagerComponent::GetColorForMapTile(int32 InIdx)
 		LOGZXEF("CurrentBiome configured incorrectly");
 		return FColor::Black;
 	}
-	// Get color range for this tile type:
-	const ETileType ChosenType = InTile->Type;
-	FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ChosenType);
-	if (ColorRange == nullptr)
-	{
-		LOGZXEF("ColorRange does not contain %d", InTile->Type);
-		return FColor::Black;
-	}
 	
 	// for map, we want to take the base color and add the shading:
-	return (FLinearColor(ColorRange->Base) + GetColorForTile(*InTile)).ToFColor(false);
+	return GetColorForTile(**CurrentBiome, InTile->Type, InTile->Altitude, true).ToFColor(false);
 }
 
-FLinearColor UGridManagerComponent::GetColorForTile(const FGridTile& InTile, ETileType TypeOverride)
+FLinearColor UGridManagerComponent::GetColorForTile(const UBiomeData& InBiome, ETileType InTileType, float InAltitude, bool bAddBaseColor)
 {
-	// Get biome from tile:
-	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InTile.Biome);
-	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
-	{
-		LOGZXEF("CurrentBiome configured incorrectly");
-		return FColor::Black;
-	}
+	FLinearColor RetColor = FColor::Black;
+	
 	// Get color range for this tile type:
-	const ETileType ChosenType = TypeOverride != ETileType::Count ? TypeOverride : InTile.Type;
-	FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ChosenType);
+	const FColorRange* ColorRange = InBiome.TileColorRanges.Find(InTileType);
 	if (ColorRange == nullptr)
 	{
-		LOGZXEF("ColorRange does not contain %d", InTile.Type);
-		return FColor::Black;
+		LOGZXEF("ColorRange does not contain %d", InTileType);
+		return RetColor;
 	}
 	
 	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Altitude)
@@ -289,11 +275,13 @@ FLinearColor UGridManagerComponent::GetColorForTile(const FGridTile& InTile, ETi
 		return LerpedColor - BaseColor;
 	};
 	
-	switch (ChosenType) 
+	switch (InTileType) 
 	{
-		case ETileType::Grass:		return CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile.Altitude);
-		case ETileType::Sand:		return CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile.Altitude);
-		case ETileType::Water:		return CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile.Altitude);
-		default:					return FColor::Black;
+		case ETileType::Grass:		RetColor = CalcShading(*ColorRange, -1, InBiome.TileTypeConfig.SandThreshold, InAltitude); break;
+		case ETileType::Sand:		RetColor = CalcShading(*ColorRange, InBiome.TileTypeConfig.WaterThreshold*2, InBiome.TileTypeConfig.SandThreshold*2, InAltitude); break;
+		case ETileType::Water:		RetColor = CalcShading(*ColorRange, 1, InBiome.TileTypeConfig.WaterThreshold, InAltitude); break;
+		default:					RetColor = FColor::Black; break;
 	}
+	
+	return bAddBaseColor ? ColorRange->Base + RetColor : RetColor;
 }

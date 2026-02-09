@@ -50,13 +50,13 @@ struct FColorRange
 	GENERATED_USTRUCT_BODY()
 	
 	UPROPERTY(EditAnywhere)
-	FColor Lightest;
+	FLinearColor Lightest;
 	
 	UPROPERTY(EditAnywhere)
-	FColor Base;
+	FLinearColor Base;
 	
 	UPROPERTY(EditAnywhere)
-	FColor Darkest;
+	FLinearColor Darkest;
 };
 
 USTRUCT(BlueprintType)

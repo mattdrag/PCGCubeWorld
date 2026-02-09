@@ -67,7 +67,7 @@ public:
 	
 	
 	// Map Data:
-	FLinearColor GetColorForTile(const FGridTile& InTile, ETileType TypeOverride = ETileType::Count);
+	FLinearColor GetColorForTile(const UBiomeData& InBiome, ETileType InTileType, float InAltitude, bool bAddBaseColor = false);
 	FColor GetColorForMapTile(int32 InIdx);
 	
 	
