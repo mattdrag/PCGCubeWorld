@@ -37,7 +37,6 @@ UENUM(BlueprintType)
 enum class ETileType : uint8
 {
 	Grass,
-	Dirt,
 	Sand,
 	Water,
 	
@@ -81,6 +80,15 @@ struct FBiomeTileTypeConfig
 	float WaterThreshold = 0.f;
 };
 
+UENUM()
+enum class EBiome : uint8
+{
+	TestGrasslands,
+	
+	Count UMETA(Hidden)
+};
+ENUM_RANGE_BY_COUNT(EBiome, ETileType::Count);
+
 /*
 **	Data for a grid tile
 */
@@ -109,6 +117,9 @@ struct FGridTile
 	// -1 means uninitialized:
 	UPROPERTY(BlueprintReadOnly)
 	int32 MyIndex = -1;
+	
+	UPROPERTY(BlueprintReadOnly)
+	EBiome Biome = EBiome::TestGrasslands;
 	
 	// weak ref to my actor in world
 	TWeakObjectPtr<AZXCube> MyCube;

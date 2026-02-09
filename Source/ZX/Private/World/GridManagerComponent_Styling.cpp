@@ -9,7 +9,6 @@
 namespace GridManagerStylingConsts
  {
  	constexpr int32 NumFoliageSlots = 8;
-	const FName TestGrasslandsName = "Data.Biome.TestGrasslands";
  }
 
 void UGridManagerComponent::LoadBiomes()
@@ -30,17 +29,17 @@ void UGridManagerComponent::LoadBiomes()
 
 		// Add to map:
 		UBiomeData* LocalBiomeData = Cast<UBiomeData>(AssetDataToParse.GetAsset());
-		if (LocalBiomeData != nullptr && LocalBiomeData->GameplayTag.IsValid())
+		if (LocalBiomeData != nullptr)
 		{
-			BiomeData.Add(LocalBiomeData->GameplayTag, LocalBiomeData);
+			BiomeData.Add(LocalBiomeData->BiomeId, LocalBiomeData);
 		}
 	}
 }
 
-ETileType UGridManagerComponent::DetermineTileType(float InAltitude)
+ETileType UGridManagerComponent::DetermineTileType(EBiome InBiome, float InAltitude)
 {
 	// TODO: right now we have 1 biome, eventually we want to pass it in as a parameter or something..
-	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag(GridManagerStylingConsts::TestGrasslandsName));
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InBiome);
 	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
 	{
 		LOGZXEF("CurrentBiome configured incorrectly");
@@ -79,9 +78,9 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 	}
 
 	const FIntPoint InCoordinate = IndexToCoordinates(InTile->MyIndex);
-
-	// MD-TODO: current biome:
-	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(FGameplayTag::RequestGameplayTag(GridManagerStylingConsts::TestGrasslandsName));
+	
+	// Get biome from tile:
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InTile->Biome);
 	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome) || !IsValid((*CurrentBiome)->TileSet))
 	{
 		LOGZXEF("CurrentBiome configured incorrectly");
@@ -97,31 +96,12 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		return;
 	}
 	
-	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Altitude)
-	{
-		// grass will go from -1 to sand thresh:
-		const float MidPoint = (DarkestVal + LightestVal) / 2;
-			
-		// Transform to linear colors in order to take diff:
-		const bool bDarken = Altitude < MidPoint;
-		const FLinearColor TargetColor = bDarken ? ColorRange.Darkest : ColorRange.Lightest;
-		const FLinearColor BaseColor = ColorRange.Base;
-		const float Alpha = (Altitude - MidPoint) / ((bDarken ? DarkestVal : LightestVal) - MidPoint) ;
-		const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha);
-
-		// shading is additive, so we actually want the diff:
-		return LerpedColor - BaseColor;
-	};
-	
 	// Base is either dirt or sand. if there are any adjacent sand tiles, it becomes sand.
 	const bool bIsSand = HasAnyNeighborsOfType(ETileType::Sand, InCoordinate);
 	DynCubeMat->SetTextureParameterValue("TopTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 	DynCubeMat->SetTextureParameterValue("SideTexture", bIsSand ? TileSet->Sand : TileSet->Dirt);
 	// Dirt shading:
-	if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ETileType::Sand))
-	{
-		DynCubeMat->SetVectorParameterValue("DirtShading", CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile->Altitude));
-	}
+	DynCubeMat->SetVectorParameterValue("DirtShading", GetColorForTile(*InTile, ETileType::Sand));
 
 	// Grass:
 	if (InTile->Type == ETileType::Grass)
@@ -165,10 +145,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Grass shading:
-		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
-		{
-			DynCubeMat->SetVectorParameterValue("Shading", CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile->Altitude));
-		}
+		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(*InTile));
 	}
 	
 	// Water:
@@ -182,12 +159,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		}
 		
 		// Water gets shaded:
-		if (FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(InTile->Type))
-		{
-			auto WaterShading = CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile->Altitude);
-			DynCubeMat->SetVectorParameterValue("Shading", WaterShading);
-			LOGZXWF("WaterShading=(%f,%f,%f)", WaterShading.R, WaterShading.G, WaterShading.B);
-		}
+		DynCubeMat->SetVectorParameterValue("Shading", GetColorForTile(*InTile));
 	}
 }
 
@@ -255,25 +227,73 @@ int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FV
 	return NumFoliage;
 }
 
-
-FColor UGridManagerComponent::GetColorForTile(int32 InIdx)
+FColor UGridManagerComponent::GetColorForMapTile(int32 InIdx)
 {
-	FGridTile* GridTile = GetGridTile(InIdx);
-	if (GridTile == nullptr)
+	// from the tile, we need base color
+	FGridTile* InTile = GetGridTile(InIdx);
+	if (InTile == nullptr)
 	{
 		return FColor::Black;
 	}
-	
-	switch (GridTile->Type) {
-	case ETileType::Grass:
-		return FColor::Green;
-	case ETileType::Dirt:
-		return FColor(124,124, 0);
-	case ETileType::Sand:
-		return FColor(124,124, 0);
-	case ETileType::Water:
-		return FColor::Blue;
-	default:
+	// Get biome from tile:
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InTile->Biome);
+	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
+	{
+		LOGZXEF("CurrentBiome configured incorrectly");
 		return FColor::Black;
+	}
+	// Get color range for this tile type:
+	const ETileType ChosenType = InTile->Type;
+	FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ChosenType);
+	if (ColorRange == nullptr)
+	{
+		LOGZXEF("ColorRange does not contain %d", InTile->Type);
+		return FColor::Black;
+	}
+	
+	// for map, we want to take the base color and add the shading:
+	return (FLinearColor(ColorRange->Base) + GetColorForTile(*InTile)).ToFColor(false);
+}
+
+FLinearColor UGridManagerComponent::GetColorForTile(const FGridTile& InTile, ETileType TypeOverride)
+{
+	// Get biome from tile:
+	TObjectPtr<UBiomeData>* CurrentBiome = BiomeData.Find(InTile.Biome);
+	if (CurrentBiome == nullptr || !IsValid(*CurrentBiome))
+	{
+		LOGZXEF("CurrentBiome configured incorrectly");
+		return FColor::Black;
+	}
+	// Get color range for this tile type:
+	const ETileType ChosenType = TypeOverride != ETileType::Count ? TypeOverride : InTile.Type;
+	FColorRange* ColorRange = (*CurrentBiome)->TileColorRanges.Find(ChosenType);
+	if (ColorRange == nullptr)
+	{
+		LOGZXEF("ColorRange does not contain %d", InTile.Type);
+		return FColor::Black;
+	}
+	
+	auto CalcShading = [](const FColorRange& ColorRange, float DarkestVal, float LightestVal, float Altitude)
+	{
+		// grass will go from -1 to sand thresh:
+		const float MidPoint = (DarkestVal + LightestVal) / 2;
+			
+		// Transform to linear colors in order to take diff:
+		const bool bDarken = Altitude < MidPoint;
+		const FLinearColor TargetColor = bDarken ? ColorRange.Darkest : ColorRange.Lightest;
+		const FLinearColor BaseColor = ColorRange.Base;
+		const float Alpha = (Altitude - MidPoint) / ((bDarken ? DarkestVal : LightestVal) - MidPoint) ;
+		const FLinearColor LerpedColor = FMath::Lerp(BaseColor, TargetColor, Alpha);
+
+		// shading is additive, so we actually want the diff:
+		return LerpedColor - BaseColor;
+	};
+	
+	switch (ChosenType) 
+	{
+		case ETileType::Grass:		return CalcShading(*ColorRange, -1, (*CurrentBiome)->TileTypeConfig.SandThreshold, InTile.Altitude);
+		case ETileType::Sand:		return CalcShading(*ColorRange, (*CurrentBiome)->TileTypeConfig.WaterThreshold*2, (*CurrentBiome)->TileTypeConfig.SandThreshold*2, InTile.Altitude);
+		case ETileType::Water:		return CalcShading(*ColorRange, 1, (*CurrentBiome)->TileTypeConfig.WaterThreshold, InTile.Altitude);
+		default:					return FColor::Black;
 	}
 }

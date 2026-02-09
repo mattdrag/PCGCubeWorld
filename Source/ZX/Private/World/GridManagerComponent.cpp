@@ -172,10 +172,14 @@ bool UGridManagerComponent::GenerateGridData()
 			// Init with our current seed:
 			FMath::RandInit(GridRandom.GetCurrentSeed());
 			
+			// todo: once we have more biomes, get actual biome
+			const EBiome ChosenBiome = EBiome::TestGrasslands;
+			
 			// Make a tile:
 			FGridTile NewTile(i * Columns + j);
 			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
-			NewTile.Type = DetermineTileType(NewTile.Altitude);
+			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
+			NewTile.Biome = ChosenBiome;
 			GridTiles.Add(NewTile);
 		}
 	}
@@ -213,9 +217,9 @@ void UGridManagerComponent::CellularAutomataStep()
 		if (GridTile.Type == ETileType::Grass && NumDirt > 4)
 		{
 			// grass dies:
-			NextGen.Add(ETileType::Dirt);
+			NextGen.Add(ETileType::Sand);
 		}
-		else if (GridTile.Type == ETileType::Dirt && NumGrass > 4)
+		else if (GridTile.Type == ETileType::Sand && NumGrass > 4)
 		{
 			// grass grows:
 			NextGen.Add(ETileType::Grass);

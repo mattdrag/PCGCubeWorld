@@ -67,7 +67,8 @@ public:
 	
 	
 	// Map Data:
-	FColor GetColorForTile(int32 InIdx);
+	FLinearColor GetColorForTile(const FGridTile& InTile, ETileType TypeOverride = ETileType::Count);
+	FColor GetColorForMapTile(int32 InIdx);
 	
 	
 	// Debug:
@@ -103,7 +104,7 @@ protected:
 	
 #pragma region Styling 
 	void LoadBiomes();
-	ETileType DetermineTileType(float InAltitude);
+	ETileType DetermineTileType(EBiome InBiome, float InAltitude);
 	void StyleCube(AZXCube* InCube);
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
@@ -125,7 +126,7 @@ private:
 	FCellularAutomataOptions CellularAutomataOptions;
 	
 	UPROPERTY()
-	TMap<FGameplayTag, TObjectPtr<UBiomeData>> BiomeData;
+	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
 	TArray<int32> ShuffledPermutation;
 	

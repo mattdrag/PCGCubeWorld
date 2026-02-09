@@ -21,7 +21,7 @@ public:
 	 * Data
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = General)
-	FGameplayTag GameplayTag;
+	EBiome BiomeId;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = General)
 	FText DisplayName;

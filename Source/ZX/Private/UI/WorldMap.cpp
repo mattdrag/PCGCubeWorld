@@ -134,8 +134,8 @@ void UWorldMap::GenerateMapTexture()
 	// Set pixel color from grid manager:
 	for (int32 x = 0; x < MapResolution_X; x++) {
 		for (int32 y = 0; y < MapResolution_Y; y++) {
-			// Color:
-			const FColor PixelColor = GridManager->GetColorForTile(GridManager->CoordinatesToIndex(x,y));
+			// Color - we have to translate from linear color (32 bit) to fcolor (8 bit):
+			const FColor PixelColor = GridManager->GetColorForMapTile(GridManager->CoordinatesToIndex(x,y));
 			
 			// NOTE: we are kinda just writing data off the end of a ptr but we just have to trust Epic on this one..
 			int32 Index = ((y * MapResolution_X) + x) * 4;
