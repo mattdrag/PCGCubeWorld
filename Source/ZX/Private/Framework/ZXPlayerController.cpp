@@ -25,6 +25,15 @@ void AZXPlayerController::BeginPlay()
 
 	// initialize delegates:
 	UIDelegates = NewObject<UUIDelegates>();
+	
+	// We listen for map closing (broadcasted by worldmap):
+	if (IsValid(UIDelegates))
+	{
+		UIDelegates->OnMapClosed.AddLambda([&]()
+		{
+			bIsWorldMapOpen = false;
+		});
+	}
 }
 
 void AZXPlayerController::OnPossess(APawn* InPawn)
@@ -35,7 +44,7 @@ void AZXPlayerController::OnPossess(APawn* InPawn)
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->Init(Cast<AZXPawn>(InPawn), ZoomSpeed);
+		CurrentZoom = MyCameraManager->Init(Cast<AZXPawn>(InPawn), ZoomSpeed);
 	}
 }
 
@@ -134,7 +143,26 @@ void AZXPlayerController::OnZoomIn()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->SetTargetOrthoWidth(FMath::Clamp(MyCameraManager->GetTargetOrthoWidth() - ZoomAmount, ZoomMin, ZoomMax));
+		const float TargetZoom = CurrentZoom - ZoomAmount;
+		
+		// Zoom input gets routed to either our camera, or the world map:
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapZoom.Broadcast(TargetZoom - CurrentZoom);
+			}
+		}
+		
+		// Camera:
+		else
+		{
+			// only set our current zoom if routing to camera:
+			CurrentZoom = FMath::Clamp(TargetZoom, ZoomMin, ZoomMax);
+			MyCameraManager->SetTargetOrthoWidth(CurrentZoom);
+		}
 	}
 }
 
@@ -143,16 +171,41 @@ void AZXPlayerController::OnZoomOut()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->SetTargetOrthoWidth(FMath::Clamp(MyCameraManager->GetTargetOrthoWidth() + ZoomAmount, ZoomMin, ZoomMax));
+		const float TargetZoom = CurrentZoom + ZoomAmount;
+		CurrentZoom = FMath::Clamp(TargetZoom, ZoomMin, ZoomMax);
+		
+		// Zoom input gets routed to either our camera, or the world map:
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapZoom.Broadcast(TargetZoom - CurrentZoom);
+			}
+		}
+		
+		// Camera:
+		else
+		{
+			MyCameraManager->SetTargetOrthoWidth(CurrentZoom);
+			
+			// we trigger map opening if we are attempting to extend beyond camera max:
+			if (TargetZoom > CurrentZoom)
+			{
+				bIsWorldMapOpen = true;
+				if (IsValid(UIDelegates))
+				{
+					UIDelegates->OnMapOpened.Broadcast();
+				}
+			}
+		}
 	}
 }
 
 void AZXPlayerController::OnMapPressed()
 {
-	if (IsValid(UIDelegates))
-	{
-		UIDelegates->OnMapTriggered.Broadcast();
-	}
+	// TODO: for now, only trigger map through zooming..
 }
 
 AGridPawn* AZXPlayerController::GetCameraGridPawn() const

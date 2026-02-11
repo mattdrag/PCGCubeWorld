@@ -67,6 +67,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomSpeed = 1.f;
 
+	// how much to zoom per scroll:
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomAmount = 100.f;
 	
@@ -101,4 +102,10 @@ private:
 	//Pawn the camera is currently following
 	UPROPERTY()
 	AGridPawn* CameraFollowPawn = nullptr;
+	
+	// current camera zoom, is clamped by min/max
+	float CurrentZoom = 0.f;
+	
+	// map is managed through zoom. we broadcast open, listen for close:
+	bool bIsWorldMapOpen = false;
 };

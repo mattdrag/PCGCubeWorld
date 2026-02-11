@@ -16,7 +16,7 @@ class ZX_API AZXCameraManager : public APlayerCameraManager
 	GENERATED_BODY()
 
 public:
-	void Init(AZXPawn* InPawn, float InSpeed);
+	float Init(AZXPawn* InPawn, float InSpeed);
 	
 	FORCEINLINE float GetTargetOrthoWidth() const { return TargetOrthoWidth; }
 	FORCEINLINE void SetTargetOrthoWidth(float InOrthoWidth) { TargetOrthoWidth = InOrthoWidth; }

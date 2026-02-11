@@ -7,17 +7,18 @@
 #include "Pawn/ZXPawn.h"
 
 
-void AZXCameraManager::Init(AZXPawn* InPawn, float InSpeed)
+float AZXCameraManager::Init(AZXPawn* InPawn, float InSpeed)
 {
 	InterpSpeed = InSpeed;
 	
 	if (!IsValid(InPawn) || !IsValid(InPawn->CameraComponent))
 	{
 		LOGZXEF("invalid pawn..");
-		return;
+		return -1.f;
 	}
 
 	TargetOrthoWidth = InPawn->CameraComponent->OrthoWidth;
+	return TargetOrthoWidth;
 }
 
 void AZXCameraManager::UpdateCamera(float DeltaTime)

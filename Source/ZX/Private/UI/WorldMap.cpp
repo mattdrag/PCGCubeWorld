@@ -33,8 +33,11 @@ void UWorldMap::NativeOnInitialized()
 	// bind a couple of our own delegate:
 	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
 	{
-		UIDelegates->OnMapTriggered.AddUObject(this, &ThisClass::HandleMapTriggered);
 		UIDelegates->OnMapGenerationComplete.AddUObject(this, &ThisClass::HandleMapGenerationComplete);
+		UIDelegates->OnMapZoom.AddUObject(this, &ThisClass::HandleMapZoom);
+		
+		// Map listens for open, broadcasts close:
+		UIDelegates->OnMapOpened.AddUObject(this, &ThisClass::HandleMapOpened);
 	}
 	
 	// Initialize to dissolved and collapsed:
@@ -71,8 +74,9 @@ void UWorldMap::NativeDestruct()
 	
 	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
 	{
-		UIDelegates->OnMapTriggered.RemoveAll(this);
+		UIDelegates->OnMapOpened.RemoveAll(this);
 		UIDelegates->OnMapGenerationComplete.RemoveAll(this);
+		UIDelegates->OnMapZoom.RemoveAll(this);
 	}
 	
 	Super::NativeDestruct();
@@ -103,17 +107,11 @@ void UWorldMap::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 }
 
-void UWorldMap::HandleMapTriggered()
+void UWorldMap::HandleMapOpened()
 {
-	// Flip flop between visible and collapsed:
-	bIsMapOpening = GetVisibility() == ESlateVisibility::Collapsed;
-	
-	// Here we handle map becoming visible, but tick will handle map collapsing:
-	if (bIsMapOpening)
-	{
-		SetVisibility(ESlateVisibility::Visible);
-	}
-	//MapMaterial->SetScalarParameterValue("ScaleUV", 5);
+	// tick uses this bool to handle fading in:
+	bIsMapOpening = true;
+	SetVisibility(ESlateVisibility::Visible);
 }
 
 void UWorldMap::HandleMapGenerationComplete()
@@ -128,7 +126,7 @@ void UWorldMap::HandleMapGenerationComplete()
 	}
 	
 	// set map scale and UV scale:
-	ZoomAmount = InitialZoom;
+	BaseZoom = InitialZoom - MapImageScale;
 	UpdateMapDimensions();
 }
 
@@ -162,6 +160,8 @@ void UWorldMap::GenerateMapTexture()
 	MapTexture->CompressionSettings = TextureCompressionSettings::TC_VectorDisplacementmap;
 	MapTexture->SRGB = 1;
 	MapTexture->Filter = TextureFilter::TF_Nearest;
+	MapTexture->AddressX = TextureAddress::TA_Clamp;
+	MapTexture->AddressY = TextureAddress::TA_Clamp;
 	MapTexture->UpdateResource();
 	
 	// Get first mip:
@@ -174,17 +174,23 @@ void UWorldMap::GenerateMapTexture()
 	}
 
 	// Set pixel color from grid manager:
-	for (int32 x = 0; x < MapResolution_X; x++) {
-		for (int32 y = 0; y < MapResolution_Y; y++) {
+	for (int32 x = 0; x < MapResolution_X; x++) 
+	{
+		for (int32 y = 0; y < MapResolution_Y; y++) 
+		{
+			// TODO: remove this later:
+			// Trim map texture in black so that the image doesnt stretch when zooming out:
+			const bool bTrimBlack = x == 0 || x == MapResolution_X - 1 || y == 0 || y == MapResolution_Y - 1;
+			
 			// Color - we have to translate from linear color (32 bit) to fcolor (8 bit):
-			const FColor PixelColor = GridManager->GetColorForMapTile(GridManager->CoordinatesToIndex(x,y));
+			const FColor PixelColor = bTrimBlack ? FColor::Black : GridManager->GetColorForMapTile(GridManager->CoordinatesToIndex(x,y));
 			
 			// NOTE: we are kinda just writing data off the end of a ptr but we just have to trust Epic on this one..
 			const int32 Index = ((y * MapResolution_X) + x) * 4;
-			TextureData[Index]     = PixelColor.B;   // Blue
-			TextureData[Index + 1] = PixelColor.G;   // Green
-			TextureData[Index + 2] = PixelColor.R; // Red
-			TextureData[Index + 3] = PixelColor.A; // Alpha
+			TextureData[Index]     = PixelColor.B;  // Blue
+			TextureData[Index + 1] = PixelColor.G;  // Green
+			TextureData[Index + 2] = PixelColor.R;	// Red
+			TextureData[Index + 3] = PixelColor.A;	// Alpha
 		}
 	}
 
@@ -199,6 +205,35 @@ void UWorldMap::OnViewportResized(FViewport* Viewport, uint32 UnusedInt)
 	UpdateMapDimensions();
 }
 
+void UWorldMap::HandleMapZoom(float ZoomInput)
+{
+	// clamp additional zoom based on target UVs:
+	const float MaxAdditionalZoom = BaseZoom + MapImageScale - MinUVScale;
+	AdditionalZoom = FMath::Clamp(AdditionalZoom + (ZoomInput * ZoomScaleModifier * UVScale), 0.f, MaxAdditionalZoom);
+	
+	// zero additional zoom and a negative zoom input should trigger a map closing:
+	if (AdditionalZoom == 0.f && ZoomInput < 0.f)
+	{
+		// tell PC to give zoom input back to camera:
+		if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+		{
+			UIDelegates->OnMapClosed.Broadcast();
+		}
+		// for dissolve out:
+		bIsMapOpening = false;
+		return;
+	}
+	
+	// the rest goes into the UVs:
+	UVScale = BaseZoom + MapImageScale - AdditionalZoom;
+	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	{
+		MapMaterial->SetScalarParameterValue("ScaleUV", UVScale);
+	}
+	
+	LOGZXSCREEN("AdditionalZoom: %f", AdditionalZoom);
+}
+
 void UWorldMap::UpdateMapDimensions()
 {
 	// using the major axis of the viewport, calc how much we need to scale the map image:
@@ -211,12 +246,11 @@ void UWorldMap::UpdateMapDimensions()
 	
 	// scale map image:
 	MapImageScale = ViewportSize.X > ViewportSize.Y ? ViewportSize.X / ViewportSize.Y : ViewportSize.Y / ViewportSize.X;
-	MapImage->SetRenderScale(FVector2D(MapImageScale, MapImageScale));
 	
-	// the rest goes into the UVs:
-	UVScale = ZoomAmount - MapImageScale;
-	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
-	{
-		MapMaterial->SetScalarParameterValue("ScaleUV", UVScale);
-	}
+	// when MapImage zoom adjusts, so does BaseZoom:
+	MapImage->SetRenderScale(FVector2D(MapImageScale, MapImageScale));
+	BaseZoom = InitialZoom - MapImageScale;
+	
+	// call a zoom with no input. this will adjust the UVs:
+	HandleMapZoom(0.f);
 }

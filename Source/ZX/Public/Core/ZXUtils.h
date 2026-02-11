@@ -50,5 +50,7 @@ public:
 	 * Map:
 	 */
 	FSimpleMulticastDelegate OnMapGenerationComplete;
-	FSimpleMulticastDelegate OnMapTriggered;
+	FSimpleMulticastDelegate OnMapOpened;
+	FSimpleMulticastDelegate OnMapClosed;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapZoom, float ZoomAmount) FOnMapZoom OnMapZoom;
 };
