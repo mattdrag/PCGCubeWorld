@@ -107,11 +107,81 @@ void UWorldMap::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 }
 
+FReply UWorldMap::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// LMB triggers drag:
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bIsDraggingMap = true;
+		LastDragPos = InMouseEvent.GetScreenSpacePosition();
+		return FReply::Handled();
+	}
+	
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UWorldMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (bIsDraggingMap)
+	{
+		const FVector2D NewDragPos = InMouseEvent.GetScreenSpacePosition();
+		if (NewDragPos != LastDragPos)
+		{
+			// Get delta:
+			const FVector2D DragDelta = LastDragPos - NewDragPos; 
+			LastDragPos = NewDragPos;
+			
+			// shift UVs:
+			if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+			{
+				// drag speed scales with UVs:
+				MapUVs += DragDelta / UVScale;
+				MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
+				MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
+			}
+		}
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UWorldMap::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// release LMB ends drag:
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bIsDraggingMap = false;
+		return FReply::Handled();
+	}
+	
+	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+void UWorldMap::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	bIsDraggingMap = false;
+	Super::NativeOnMouseLeave(InMouseEvent);
+}
+
 void UWorldMap::HandleMapOpened()
 {
 	// tick uses this bool to handle fading in:
 	bIsMapOpening = true;
 	SetVisibility(ESlateVisibility::Visible);
+}
+
+void UWorldMap::CloseMap()
+{
+	// tell PC to give zoom input back to camera:
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	{
+		UIDelegates->OnMapClosed.Broadcast();
+	}
+	// for dissolve out:
+	bIsMapOpening = false;
+	// making hit test invisible will end / prevent drag:
+	SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void UWorldMap::HandleMapGenerationComplete()
@@ -214,13 +284,7 @@ void UWorldMap::HandleMapZoom(float ZoomInput)
 	// zero additional zoom and a negative zoom input should trigger a map closing:
 	if (AdditionalZoom == 0.f && ZoomInput < 0.f)
 	{
-		// tell PC to give zoom input back to camera:
-		if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
-		{
-			UIDelegates->OnMapClosed.Broadcast();
-		}
-		// for dissolve out:
-		bIsMapOpening = false;
+		CloseMap();
 		return;
 	}
 	
@@ -230,8 +294,6 @@ void UWorldMap::HandleMapZoom(float ZoomInput)
 	{
 		MapMaterial->SetScalarParameterValue("ScaleUV", UVScale);
 	}
-	
-	LOGZXSCREEN("AdditionalZoom: %f", AdditionalZoom);
 }
 
 void UWorldMap::UpdateMapDimensions()

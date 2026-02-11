@@ -20,8 +20,15 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
+	// Drag:
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
+	
 	// player hits the zoom threshold:
 	void HandleMapOpened();
+	void CloseMap();
 	
 	// player zooms past camera max:
 	void HandleMapZoom(float ZoomInput);
@@ -74,4 +81,8 @@ private:
 	float UVScale = 1.f;
 	
 	float BaseZoom = 10.f;
+	
+	bool bIsDraggingMap = false;
+	FVector2D LastDragPos;
+	FVector2D MapUVs;
 };
