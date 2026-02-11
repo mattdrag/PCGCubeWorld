@@ -33,6 +33,9 @@ protected:
 	// player zooms past camera max:
 	void HandleMapZoom(float ZoomInput);
 	
+	// Map grid movement
+	void HandleMapGridMove(FIntPoint NewGridCoords);
+	
 	// called when grid manager has finished map gen:
 	void HandleMapGenerationComplete();
 	void GenerateMapTexture();
@@ -40,6 +43,9 @@ protected:
 	// recalc dimensions whenever screen resolution changes:
 	void UpdateMapDimensions();
 	void OnViewportResized(FViewport* Viewport, uint32 UnusedInt);
+	
+	// translate world grid to map uvs
+	FVector2D GridCoordsToMapUVs(const FIntPoint& InGridCoords);
 	
 	// We hold ptr for texture, uproperty will handle gc:
 	UPROPERTY()
@@ -85,4 +91,7 @@ private:
 	bool bIsDraggingMap = false;
 	FVector2D LastDragPos;
 	FVector2D MapUVs;
+	
+	FIntPoint GridMidpoint;
+	FIntPoint MyGridLoc;
 };

@@ -12,6 +12,8 @@ namespace WorldMapConsts
 {
 	constexpr float DissolveHidden = 1.f;
 	constexpr float DissolveVisible = 0.f;
+	
+	constexpr float UVScaleMulti = 0.0001;
 }
 
 void UWorldMap::NativeOnInitialized()
@@ -35,6 +37,7 @@ void UWorldMap::NativeOnInitialized()
 	{
 		UIDelegates->OnMapGenerationComplete.AddUObject(this, &ThisClass::HandleMapGenerationComplete);
 		UIDelegates->OnMapZoom.AddUObject(this, &ThisClass::HandleMapZoom);
+		UIDelegates->OnMapGridMove.AddUObject(this, &ThisClass::HandleMapGridMove);
 		
 		// Map listens for open, broadcasts close:
 		UIDelegates->OnMapOpened.AddUObject(this, &ThisClass::HandleMapOpened);
@@ -77,6 +80,7 @@ void UWorldMap::NativeDestruct()
 		UIDelegates->OnMapOpened.RemoveAll(this);
 		UIDelegates->OnMapGenerationComplete.RemoveAll(this);
 		UIDelegates->OnMapZoom.RemoveAll(this);
+		UIDelegates->OnMapGridMove.RemoveAll(this);
 	}
 	
 	Super::NativeDestruct();
@@ -135,9 +139,11 @@ FReply UWorldMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerE
 			if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
 			{
 				// drag speed scales with UVs:
-				MapUVs += DragDelta / UVScale;
+				MapUVs += DragDelta / UVScale * WorldMapConsts::UVScaleMulti;
 				MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
 				MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
+				
+				LOGZXSCREEN("UVScale= %f | UVs= %f,%f | MapImageScale= %f", UVScale, MapUVs.X, MapUVs.Y, MapImageScale);
 			}
 		}
 		return FReply::Handled();
@@ -160,8 +166,24 @@ FReply UWorldMap::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPoin
 
 void UWorldMap::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 {
-	bIsDraggingMap = false;
 	Super::NativeOnMouseLeave(InMouseEvent);
+	
+	bIsDraggingMap = false;
+}
+
+void UWorldMap::HandleMapGridMove(FIntPoint NewGridCoords)
+{
+	const FIntPoint InvertedCoords = FIntPoint(NewGridCoords.Y, -NewGridCoords.X);
+	MyGridLoc += InvertedCoords;
+	
+	// shift UVs:
+	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	{
+		// drag speed scales with UVs:
+		MapUVs = GridCoordsToMapUVs(MyGridLoc);
+		MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
+		MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
+	}
 }
 
 void UWorldMap::HandleMapOpened()
@@ -186,6 +208,15 @@ void UWorldMap::CloseMap()
 
 void UWorldMap::HandleMapGenerationComplete()
 {
+	// Get grid center (this aligns with UV 0,0s)
+	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
+	if (!IsValid(GridManager))
+	{
+		return;
+	}
+	GridMidpoint = GridManager->GetGridMidpoint();
+	MyGridLoc = GridMidpoint;
+	
 	// run generation:
 	GenerateMapTexture();
 	
@@ -273,6 +304,17 @@ void UWorldMap::OnViewportResized(FViewport* Viewport, uint32 UnusedInt)
 {
 	// just wrap UpdateMapDimensions for now..
 	UpdateMapDimensions();
+}
+
+FVector2D UWorldMap::GridCoordsToMapUVs(const FIntPoint& InGridCoords)
+{
+	// remap UV range goes from [-1, 1]
+	// y = 2x - 1
+	const FIntPoint GridBounds = GridMidpoint * 2;
+	const float RemappedU = (2 * (InGridCoords.X * 1.f / GridBounds.X) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
+	const float RemappedV = (2 * (InGridCoords.Y * 1.f / GridBounds.Y) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
+	
+	return FVector2D(RemappedU, RemappedV);
 }
 
 void UWorldMap::HandleMapZoom(float ZoomInput)

@@ -34,6 +34,8 @@ public:
 	// Basic movement speed into movement input action rn:
 	UPROPERTY(EditAnywhere, Category = Movement)
 	float MovementSpeed = 1.f;
+	
+	FORCEINLINE int32 GetGridLocation() const { return LastGridLocation; };
 
 protected:
 	// Called when the game starts or when spawned

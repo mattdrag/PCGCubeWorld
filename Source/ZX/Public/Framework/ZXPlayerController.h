@@ -29,6 +29,7 @@ public:
 	virtual void SetupInputComponent() override;
 	
 	void Move(const FInputActionValue& InActionValue);
+	void GridMove(const FInputActionValue& InActionValue);
 	void FollowGridPawn(const FInputActionValue& InActionValue);
 	void UnfollowGridPawn(const FInputActionValue& InActionValue);
 	void CommandMoveTo(const FInputActionValue& InActionValue);
@@ -41,10 +42,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputMappingContext* ZXMappingContext;
 
-	// handles move action
 	// Input Actions:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IAMove;
+	
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IAGridMove;
 	
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IACameraFollow;

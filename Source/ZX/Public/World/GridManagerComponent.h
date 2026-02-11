@@ -48,6 +48,7 @@ public:
 	FORCEINLINE int32 GetNumGridTiles() const { return GridTiles.Num(); }
 	FORCEINLINE int32 GetNumRows() const { return Rows; }
 	FORCEINLINE int32 GetNumColumns() const { return Columns; }
+	FORCEINLINE FIntPoint GetGridMidpoint() const { return FIntPoint(Rows/2, Columns/2); }
 	
 	
 	// Grid Generation:
