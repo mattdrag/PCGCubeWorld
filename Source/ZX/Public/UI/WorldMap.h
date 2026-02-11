@@ -27,7 +27,7 @@ protected:
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	
 	// player hits the zoom threshold:
-	void HandleMapOpened();
+	void HandleMapOpened(FVector InWorldLocation);
 	void CloseMap();
 	
 	// player zooms past camera max:
@@ -46,6 +46,12 @@ protected:
 	
 	// translate world grid to map uvs
 	FVector2D GridCoordsToMapUVs(const FIntPoint& InGridCoords);
+	
+	// helper that transforms coord systems. anytime we receive coords from grid we should call this initially:
+	FORCEINLINE FIntPoint GridToMap(const FIntPoint& InGridCoords) const { return FIntPoint(InGridCoords.Y, -InGridCoords.X); }
+	
+	// helper for setting uvs in material:
+	void SetMapUVs(const FVector2D& InMapUVs);
 	
 	// We hold ptr for texture, uproperty will handle gc:
 	UPROPERTY()

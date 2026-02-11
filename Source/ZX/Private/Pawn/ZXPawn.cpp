@@ -48,7 +48,7 @@ void AZXPawn::BeginPlay()
 	
 	// start at zero vec:
 	SetActorRotation(FRotator::ZeroRotator);
-	SetActorLocation(FVector::ZeroVector);
+	SetActorLocation(FVector::ZeroVector + FVector(0.f, 0.f, GridManager->GetZHeight()));
 	
 	// Load once:
 	LastGridLocation = GridManager->WorldToIndex(GetActorLocation());

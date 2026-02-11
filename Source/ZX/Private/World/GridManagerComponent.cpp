@@ -114,6 +114,11 @@ int32 UGridManagerComponent::WorldToIndex(const FVector& InWorld) const
 	return CoordinatesToIndex(WorldToCoordinates(InWorld));
 }
 
+FVector UGridManagerComponent::SnapToGrid(const FVector& InWorldLocation) const
+{
+	return IndexToWorld(WorldToIndex(InWorldLocation));
+}
+
 TArray<FGridTile*> UGridManagerComponent::GetGridTilesInRadius(int32 OriginPoint, int32 Radius, bool bIncludeOrigin, bool bCheckIfOccupied)
 {
 	TArray<FGridTile*> RetArr;

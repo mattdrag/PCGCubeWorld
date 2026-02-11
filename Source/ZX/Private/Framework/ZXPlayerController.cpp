@@ -232,9 +232,10 @@ void AZXPlayerController::OnZoomOut()
 			if (TargetZoom > CurrentZoom)
 			{
 				bIsWorldMapOpen = true;
-				if (IsValid(UIDelegates))
+				AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+				if (IsValid(MyPawn) && IsValid(UIDelegates))
 				{
-					UIDelegates->OnMapOpened.Broadcast();
+					UIDelegates->OnMapOpened.Broadcast(MyPawn->GetActorLocation());
 				}
 			}
 		}

@@ -171,26 +171,51 @@ void UWorldMap::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 	bIsDraggingMap = false;
 }
 
-void UWorldMap::HandleMapGridMove(FIntPoint NewGridCoords)
+void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 {
-	const FIntPoint InvertedCoords = FIntPoint(NewGridCoords.Y, -NewGridCoords.X);
-	MyGridLoc += InvertedCoords;
-	
-	// shift UVs:
-	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
+	if (!IsValid(GridManager))
 	{
-		// drag speed scales with UVs:
-		MapUVs = GridCoordsToMapUVs(MyGridLoc);
-		MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
-		MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
+		return;
 	}
-}
-
-void UWorldMap::HandleMapOpened()
-{
+	
 	// tick uses this bool to handle fading in:
 	bIsMapOpening = true;
 	SetVisibility(ESlateVisibility::Visible);
+	
+	// Initialize scale:
+	AdditionalZoom = 0.f;
+	UVScale = InitialZoom;
+	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	{
+		MapMaterial->SetScalarParameterValue("ScaleUV", UVScale);
+	}
+	
+	// use gridmanager to set our initial UVs:
+	
+	// todo: derive a formula. for now: midpoint diff method;
+	const FIntPoint GridSpaceCoords = GridManager->WorldToCoordinates(InWorldLocation);
+	const FIntPoint MidDiff = GridSpaceCoords - GridMidpoint;
+	MyGridLoc = GridMidpoint + GridToMap(MidDiff);
+	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
+}
+
+void UWorldMap::HandleMapGridMove(FIntPoint NewGridCoords)
+{
+	MyGridLoc += GridToMap(NewGridCoords);
+	
+	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
+}
+
+void UWorldMap::SetMapUVs(const FVector2D& InMapUVs)
+{
+	if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+	{
+		// drag speed scales with UVs:
+		MapUVs = InMapUVs;
+		MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
+		MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
+	}
 }
 
 void UWorldMap::CloseMap()
@@ -215,7 +240,6 @@ void UWorldMap::HandleMapGenerationComplete()
 		return;
 	}
 	GridMidpoint = GridManager->GetGridMidpoint();
-	MyGridLoc = GridMidpoint;
 	
 	// run generation:
 	GenerateMapTexture();
@@ -308,11 +332,14 @@ void UWorldMap::OnViewportResized(FViewport* Viewport, uint32 UnusedInt)
 
 FVector2D UWorldMap::GridCoordsToMapUVs(const FIntPoint& InGridCoords)
 {
+	// We dont wanna point top left edge of tile, we wanna be in the middle:
+	const FVector2D HalfwayGridCoords = FVector2D(InGridCoords.X + 0.5f, InGridCoords.Y - 0.5f);
+	
 	// remap UV range goes from [-1, 1]
 	// y = 2x - 1
 	const FIntPoint GridBounds = GridMidpoint * 2;
-	const float RemappedU = (2 * (InGridCoords.X * 1.f / GridBounds.X) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
-	const float RemappedV = (2 * (InGridCoords.Y * 1.f / GridBounds.Y) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
+	const float RemappedU = (2 * (HalfwayGridCoords.X * 1.f / GridBounds.X) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
+	const float RemappedV = (2 * (HalfwayGridCoords.Y * 1.f / GridBounds.Y) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
 	
 	return FVector2D(RemappedU, RemappedV);
 }

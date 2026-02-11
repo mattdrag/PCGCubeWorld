@@ -41,6 +41,7 @@ public:
 	FVector IndexToWorld(int32 InIndex) const;
 	FIntPoint WorldToCoordinates(const FVector& InWorld) const;
 	int32 WorldToIndex(const FVector& InWorld) const;
+	FVector SnapToGrid(const FVector& InWorldLocation) const;
 	
 
 	// Simple getters:
@@ -49,6 +50,7 @@ public:
 	FORCEINLINE int32 GetNumRows() const { return Rows; }
 	FORCEINLINE int32 GetNumColumns() const { return Columns; }
 	FORCEINLINE FIntPoint GetGridMidpoint() const { return FIntPoint(Rows/2, Columns/2); }
+	FORCEINLINE float GetZHeight() const { return CubeSize; }
 	
 	
 	// Grid Generation:
@@ -86,9 +88,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 CubeSize = 100;
-
-	UPROPERTY(EditDefaultsOnly, Category="Generation")
-	int32 Z_Height = 100;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 GridSeed = 0;
