@@ -117,7 +117,7 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 	if (IsValid(MyPawn) && IsValid(GridManager))
 	{
 		// add input to Coordinates:
-		const FIntPoint NewCoords = GridManager->IndexToCoordinates(MyPawn->GetGridLocation()) + FIntPoint(IntegerInput.X, IntegerInput.Y);
+		const FIntPoint NewCoords = MyPawn->GetGridLocation() + FIntPoint(IntegerInput.X, IntegerInput.Y);
 		
 		// if map is open, send input to map:
 		if (bIsWorldMapOpen)

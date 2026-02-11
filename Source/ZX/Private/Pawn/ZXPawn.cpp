@@ -51,19 +51,23 @@ void AZXPawn::BeginPlay()
 	SetActorLocation(FVector::ZeroVector + FVector(0.f, 0.f, GridManager->GetZHeight()));
 	
 	// Load once:
-	LastGridLocation = GridManager->WorldToIndex(GetActorLocation());
-	const FIntPoint CurrentCoord = GridManager->IndexToCoordinates(LastGridLocation);
+	LastGridLocation = GridManager->WorldToCoordinates(GetActorLocation());
 	// Do a single blocking load:
 	for (int32 x = -CubeLoadRange.X; x <= CubeLoadRange.X; x++)
 	{
 		for (int32 y = -CubeLoadRange.Y; y <= CubeLoadRange.Y; y++)
 		{
-			const int32 CubeIdx = GridManager->CoordinatesToIndex(CurrentCoord + FIntPoint(x, y));
+			const int32 CubeIdx = GridManager->CoordinatesToIndex(LastGridLocation + FIntPoint(x, y));
 			GridManager->SpawnCube(CubeIdx);
 			LoadedCubes.Add(CubeIdx);
 		}
 	}
-	LoadedCubeWindow = FBox2D(CurrentCoord + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y)*-1, CurrentCoord + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y));
+	LoadedCubeWindow = FBox2D(LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y)*-1, LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y));
+}
+
+void AZXPawn::SetGridLocation(const FIntPoint& InGridCoord)
+{
+	// todo: instantly blocking load?
 }
 
 // Called every frame
@@ -80,7 +84,7 @@ void AZXPawn::Tick(float DeltaTime)
 	UGridManagerComponent* GridManager = CachedGridManager.Get();
 	if (IsValid(GridManager))
 	{
-		const int32 CurrentGridLocation = GridManager->WorldToIndex(GetActorLocation());
+		const FIntPoint CurrentGridLocation = GridManager->WorldToCoordinates(GetActorLocation());
 		if (CurrentGridLocation != LastGridLocation)
 		{
 			// if we change locations, buffer some cubes to be loaded:
@@ -153,7 +157,7 @@ void AZXPawn::Tick(float DeltaTime)
 	}
 }
 
-void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
+void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLocation)
 {
 	UGridManagerComponent* GridManager = CachedGridManager.Get();
 	if (!IsValid(GridManager))
@@ -162,9 +166,7 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 	}
 	
 	// loading window slides to new location, get new box, then take the difference:
-	const FIntPoint OldCoord = GridManager->IndexToCoordinates(OldLocation);
-	const FIntPoint NewCoord = GridManager->IndexToCoordinates(NewLocation);
-	const FIntPoint Diff = NewCoord - OldCoord;
+	const FIntPoint Diff = NewLocation - OldLocation;
 	
 	auto BufferOperation = [&](int32 XMin, int32 XMax, int32 YMin, int32 YMax, bool bLoad)
 	{
