@@ -17,6 +17,18 @@ DECLARE_LOG_CATEGORY_EXTERN(LogZX, Log, All);
 #define LOGZXWF(Format, ...) UE_LOG(LogZX, Warning, TEXT("%s : " Format), ANSI_TO_TCHAR(__FUNCTION__), ##__VA_ARGS__)
 #define LOGZXEF(Format, ...) UE_LOG(LogZX, Error, TEXT("%s : " Format), ANSI_TO_TCHAR(__FUNCTION__), ##__VA_ARGS__)
 
+// for debugging:
+#define LOGZXSCR(Format, ...) \
+if (GEngine) \
+{ \
+	GEngine->AddOnScreenDebugMessage( \
+		-1, \
+		4.f, \
+		FColor::Yellow, \
+		FString::Printf(TEXT(Format), ##__VA_ARGS__) \
+	); \
+}
+
 // cvars:
 namespace ZXCVars
 {

@@ -27,6 +27,7 @@ public:
 	
 	// Tile Getters:
 	FGridTile* GetGridTile(const int32 InIndex);
+	FGridTile* GetGridTile(int32 X, int32 Y);
 	FGridTile* GetGridTile(const FIntPoint& InCoordinates);
 	TArray<FGridTile*> GetGridTilesInRadius(int32 OriginPoint, int32 Radius = 1, bool bIncludeOrigin = false, bool bCheckIfOccupied = false);
 	FGridTile* GetOpenGridTile(int32 OriginPoint, uint32 Radius = 1, bool bIncludeOrigin = false, bool bDeterministic = false);
@@ -40,12 +41,16 @@ public:
 	FVector IndexToWorld(int32 InIndex) const;
 	FIntPoint WorldToCoordinates(const FVector& InWorld) const;
 	int32 WorldToIndex(const FVector& InWorld) const;
+	FVector SnapToGrid(const FVector& InWorldLocation) const;
 	
 
 	// Simple getters:
+	FORCEINLINE int32 IsGridGenerated() const { return bIsDataGenerated; }
 	FORCEINLINE int32 GetNumGridTiles() const { return GridTiles.Num(); }
 	FORCEINLINE int32 GetNumRows() const { return Rows; }
 	FORCEINLINE int32 GetNumColumns() const { return Columns; }
+	FORCEINLINE FIntPoint GetGridMidpoint() const { return FIntPoint(Rows/2, Columns/2); }
+	FORCEINLINE float GetZHeight() const { return CubeSize; }
 	
 	
 	// Grid Generation:
@@ -57,12 +62,16 @@ public:
 	void FreeCube(const FGridTile& InTile);
 	void MarkCube(int32 InCubeIndex);
 	void CellularAutomataStep();
-	bool GenerateWater();
 	
 	
 	// Places a guy on the grid:
 	void PlacePawnOnGrid(AGridPawn* GridPawn, FGridTile* GridTile);
 	void PlacePawnOnGrid(AGridPawn* GridPawn, int32 GridTile);
+	
+	
+	// Map Data:
+	FLinearColor GetColorForTile(const UBiomeData& InBiome, ETileType InTileType, float InAltitude, bool bAddBaseColor = false);
+	FColor GetColorForMapTile(int32 InIdx);
 	
 	
 	// Debug:
@@ -79,9 +88,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 CubeSize = 100;
-
-	UPROPERTY(EditDefaultsOnly, Category="Generation")
-	int32 Z_Height = 100;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 GridSeed = 0;
@@ -93,29 +99,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
 	float PerlinScalar = 0.01;
 	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_Grass = 0;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_FoliageLB = 0;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=-1,ClampMax=1))
-	float MoistureThresh_FoliageUB = 1;
-	
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
+#pragma region Styling 
 	void LoadBiomes();
-
+	ETileType DetermineTileType(EBiome InBiome, float InAltitude);
 	void StyleCube(AZXCube* InCube);
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
+	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
-	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints);
+	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
 
 	float PerlinNoiseZX(const FVector2D& Location);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
 	TArray<uint8> BitmaskToTileStyle;
+#pragma endregion Styling
 	
 private:
 	UPROPERTY()
@@ -126,7 +126,10 @@ private:
 	FCellularAutomataOptions CellularAutomataOptions;
 	
 	UPROPERTY()
-	TMap<FGameplayTag, TObjectPtr<UBiomeData>> BiomeData;
+	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
 	TArray<int32> ShuffledPermutation;
+	
+	// TODO: change to an enum when grid generation is more complex
+	bool bIsDataGenerated = false;
 };

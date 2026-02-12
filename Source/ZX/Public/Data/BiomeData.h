@@ -4,6 +4,7 @@
 
 #include "Core/ZX.h"
 #include "ZXPrimaryDataAsset.h"
+#include "World/GridTypes.h"
 #include "BiomeData.generated.h"
 
 class UTileSetData;
@@ -20,18 +21,36 @@ public:
 	 * Data
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = General)
-	FGameplayTag GameplayTag;
+	EBiome BiomeId;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = General)
 	FText DisplayName;
 
+	
 	// Tile Set:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
-	UTileSetData* TileSet;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TObjectPtr<UTexture> Dirt;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TObjectPtr<UTexture> Sand;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TArray<UTexture*> Grass;
 
-	// Sprite Foliage - in world sprites stood upright:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Data)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
 	TArray<UTexture*> Foliage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
+	TArray<UTexture*> Water;
+
+	
+	// Styling:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
+	FBiomeTileTypeConfig TileTypeConfig;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Styling)
+	TMap<ETileType, FColorRange> TileColorRanges;
+	
 	
 	/**
 	 * Meta  - Include with every new Data Asset

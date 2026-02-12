@@ -25,6 +25,15 @@ void AZXPlayerController::BeginPlay()
 
 	// initialize delegates:
 	UIDelegates = NewObject<UUIDelegates>();
+	
+	// We listen for map closing (broadcasted by worldmap):
+	if (IsValid(UIDelegates))
+	{
+		UIDelegates->OnMapClosed.AddLambda([&](FIntPoint UnusedLoc)
+		{
+			bIsWorldMapOpen = false;
+		});
+	}
 }
 
 void AZXPlayerController::OnPossess(APawn* InPawn)
@@ -35,7 +44,7 @@ void AZXPlayerController::OnPossess(APawn* InPawn)
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->Init(Cast<AZXPawn>(InPawn), ZoomSpeed);
+		CurrentZoom = MyCameraManager->Init(Cast<AZXPawn>(InPawn), ZoomSpeed);
 	}
 }
 
@@ -66,12 +75,14 @@ void AZXPlayerController::SetupInputComponent()
 	
 	// Bind Actions:
 	EnhancedInputComp->BindAction(IAMove, ETriggerEvent::Triggered, this, &AZXPlayerController::Move);
+	EnhancedInputComp->BindAction(IAGridMove, ETriggerEvent::Started, this, &AZXPlayerController::GridMove);
 	EnhancedInputComp->BindAction(IACameraFollow, ETriggerEvent::Completed, this, &ThisClass::FollowGridPawn);
 	EnhancedInputComp->BindAction(IACameraUnfollow, ETriggerEvent::Completed, this, &ThisClass::UnfollowGridPawn);
 	EnhancedInputComp->BindAction(IACommandMoveTo, ETriggerEvent::Completed, this, &ThisClass::CommandMoveTo);
 	EnhancedInputComp->BindAction(IACameraZoomIn, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomIn);
 	EnhancedInputComp->BindAction(IACameraZoomOut, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomOut);
-
+	EnhancedInputComp->BindAction(IAOpenMap, ETriggerEvent::Started,this, &AZXPlayerController::OnMapPressed);
+	
 	// Setup Mappings:
 	EnhancedInputSubsystem->ClearAllMappings();
 	EnhancedInputSubsystem->AddMappingContext(ZXMappingContext, 0);
@@ -79,14 +90,51 @@ void AZXPlayerController::SetupInputComponent()
 
 void AZXPlayerController::Move(const FInputActionValue& InActionValue)
 {
+	// we cannot move while map is open:
+	if (bIsWorldMapOpen)
+	{
+		return;
+	}
+	
 	// Move on 2D plane (no Z input rn)
 	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
-	AZXPawn* CameraPawn = UZXUtils::GetZXPawn(GetWorld());
+	AZXPawn* CameraPawn = UZXUtils::GetZXPawn(this);
 	if (!IsValid(CameraPawn))
 	{
 		return;
 	}
 	CameraPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), CameraPawn->MovementSpeed);
+}
+
+void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
+{
+	// teleport movement:
+	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
+	const FIntPoint IntegerInput = FIntPoint(Input.X, Input.Y);
+	
+	AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
+	if (IsValid(MyPawn) && IsValid(GridManager))
+	{
+		// add input to Coordinates:
+		const FIntPoint NewCoords = MyPawn->GetGridLocation() + FIntPoint(IntegerInput.X, IntegerInput.Y);
+		
+		// if map is open, send input to map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapGridMove.Broadcast(IntegerInput);
+			}
+		}
+		
+		// else move pawn:
+		else
+		{
+			const FVector NewWorldLoc = GridManager->CoordinatesToWorld(NewCoords);
+			MyPawn->SetActorLocation(FVector(NewWorldLoc.X, NewWorldLoc.Y, MyPawn->GetActorLocation().Z));
+		}
+	}
 }
 
 void AZXPlayerController::FollowGridPawn(const FInputActionValue& InActionValue)
@@ -133,7 +181,26 @@ void AZXPlayerController::OnZoomIn()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->TargetOrthoWidth -= ZoomAmount;
+		const float TargetZoom = CurrentZoom - ZoomAmount;
+		
+		// Zoom input gets routed to either our camera, or the world map:
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapZoom.Broadcast(TargetZoom - CurrentZoom);
+			}
+		}
+		
+		// Camera:
+		else
+		{
+			// only set our current zoom if routing to camera:
+			CurrentZoom = FMath::Clamp(TargetZoom, ZoomMin, ZoomMax);
+			MyCameraManager->SetTargetOrthoWidth(CurrentZoom);
+		}
 	}
 }
 
@@ -142,8 +209,42 @@ void AZXPlayerController::OnZoomOut()
 	AZXCameraManager* MyCameraManager = Cast<AZXCameraManager>(PlayerCameraManager);
 	if (IsValid(MyCameraManager))
 	{
-		MyCameraManager->TargetOrthoWidth += ZoomAmount;
+		const float TargetZoom = CurrentZoom + ZoomAmount;
+		CurrentZoom = FMath::Clamp(TargetZoom, ZoomMin, ZoomMax);
+		
+		// Zoom input gets routed to either our camera, or the world map:
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapZoom.Broadcast(TargetZoom - CurrentZoom);
+			}
+		}
+		
+		// Camera:
+		else
+		{
+			MyCameraManager->SetTargetOrthoWidth(CurrentZoom);
+			
+			// we trigger map opening if we are attempting to extend beyond camera max:
+			if (TargetZoom > CurrentZoom)
+			{
+				bIsWorldMapOpen = true;
+				AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+				if (IsValid(MyPawn) && IsValid(UIDelegates))
+				{
+					UIDelegates->OnMapOpened.Broadcast(MyPawn->GetActorLocation());
+				}
+			}
+		}
 	}
+}
+
+void AZXPlayerController::OnMapPressed()
+{
+	// TODO: for now, only trigger map through zooming..
 }
 
 AGridPawn* AZXPlayerController::GetCameraGridPawn() const

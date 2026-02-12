@@ -34,12 +34,17 @@ public:
 	// Basic movement speed into movement input action rn:
 	UPROPERTY(EditAnywhere, Category = Movement)
 	float MovementSpeed = 1.f;
+	
+	// route location updates through here for chunk loading purposes:
+	void SetGridLocation(const FIntPoint& InGridCoord);
+	FORCEINLINE FIntPoint GetGridLocation() const { return LastGridLocation; }
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
-	void BufferCubes(int32 OldLocation, int32 NewLocation);
+	void BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLocation);
 	
 	void BufferLoad(int32 InIdx);
 	void BufferUnload(int32 InIdx);
@@ -61,7 +66,7 @@ protected:
 
 private:
 	// we load grid tiles based on our location:
-	int32 LastGridLocation = -1;
+	FIntPoint LastGridLocation;
 	
 	FBox2D LoadedCubeWindow;
 	

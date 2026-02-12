@@ -32,6 +32,15 @@ AZXPawn::AZXPawn()
 void AZXPawn::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	// delegates:
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	{
+		UIDelegates->OnMapClosed.AddLambda([&](FIntPoint NewGridCoord)
+		{
+			SetGridLocation(NewGridCoord);
+		});
+	}
 
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
 	if (!IsValid(GridManager))
@@ -48,22 +57,45 @@ void AZXPawn::BeginPlay()
 	
 	// start at zero vec:
 	SetActorRotation(FRotator::ZeroRotator);
-	SetActorLocation(FVector::ZeroVector);
+	SetActorLocation(FVector::ZeroVector + FVector(0.f, 0.f, GridManager->GetZHeight()));
 	
 	// Load once:
-	LastGridLocation = GridManager->WorldToIndex(GetActorLocation());
-	const FIntPoint CurrentCoord = GridManager->IndexToCoordinates(LastGridLocation);
+	LastGridLocation = GridManager->WorldToCoordinates(GetActorLocation());
 	// Do a single blocking load:
 	for (int32 x = -CubeLoadRange.X; x <= CubeLoadRange.X; x++)
 	{
 		for (int32 y = -CubeLoadRange.Y; y <= CubeLoadRange.Y; y++)
 		{
-			const int32 CubeIdx = GridManager->CoordinatesToIndex(CurrentCoord + FIntPoint(x, y));
+			const int32 CubeIdx = GridManager->CoordinatesToIndex(LastGridLocation + FIntPoint(x, y));
 			GridManager->SpawnCube(CubeIdx);
 			LoadedCubes.Add(CubeIdx);
 		}
 	}
-	LoadedCubeWindow = FBox2D(CurrentCoord + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y)*-1, CurrentCoord + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y));
+	LoadedCubeWindow = FBox2D(LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y)*-1, LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y));
+}
+
+void AZXPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this, false))
+	{
+		UIDelegates->OnMapClosed.RemoveAll(this);
+	}
+	
+	Super::EndPlay(EndPlayReason);
+}
+
+void AZXPawn::SetGridLocation(const FIntPoint& InGridCoord)
+{
+	UGridManagerComponent* GridManager = CachedGridManager.Get();
+	if (!IsValid(GridManager))
+	{
+		LOGZXEF("grid manager invalid..");
+		return;
+	}
+	
+	SetActorLocation(GridManager->CoordinatesToWorld(InGridCoord));
+	
+	// todo: instantly blocking load?
 }
 
 // Called every frame
@@ -80,7 +112,7 @@ void AZXPawn::Tick(float DeltaTime)
 	UGridManagerComponent* GridManager = CachedGridManager.Get();
 	if (IsValid(GridManager))
 	{
-		const int32 CurrentGridLocation = GridManager->WorldToIndex(GetActorLocation());
+		const FIntPoint CurrentGridLocation = GridManager->WorldToCoordinates(GetActorLocation());
 		if (CurrentGridLocation != LastGridLocation)
 		{
 			// if we change locations, buffer some cubes to be loaded:
@@ -113,7 +145,7 @@ void AZXPawn::Tick(float DeltaTime)
 			LocalLoadedCubes.Reserve(LoadedCubesPerFrame);
 			for (const int32 CubeIdx : CubeBuffer_Load)
 			{
-				GridManager->SpawnCube(CubeIdx, LocalMarkedCubes[i]);
+				GridManager->SpawnCube(CubeIdx, LocalMarkedCubes.IsValidIndex(i) ? LocalMarkedCubes[i] : -1);
 				LoadedCubes.Add(CubeIdx);
 				LocalLoadedCubes.Add(CubeIdx);
 				i++;
@@ -153,7 +185,7 @@ void AZXPawn::Tick(float DeltaTime)
 	}
 }
 
-void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
+void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLocation)
 {
 	UGridManagerComponent* GridManager = CachedGridManager.Get();
 	if (!IsValid(GridManager))
@@ -162,9 +194,9 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 	}
 	
 	// loading window slides to new location, get new box, then take the difference:
-	const FIntPoint OldCoord = GridManager->IndexToCoordinates(OldLocation);
-	const FIntPoint NewCoord = GridManager->IndexToCoordinates(NewLocation);
-	const FIntPoint Diff = NewCoord - OldCoord;
+	const FIntPoint Diff = NewLocation - OldLocation;
+	
+	// NOTE: fix the excess window sliding problem where going beyond a full window will cause load buffer to overflow with the extra.
 	
 	auto BufferOperation = [&](int32 XMin, int32 XMax, int32 YMin, int32 YMax, bool bLoad)
 	{
@@ -186,8 +218,9 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Min.Y + Diff.Y, 
 						false);
 		// load:
+		const int32 Excess = FMath::Clamp(Diff.Y - CubeLoadRange.Y * 2 - 1, 0, TNumericLimits<int32>::Max());
 		BufferOperation(LoadedCubeWindow.Min.X, LoadedCubeWindow.Max.X + 1, 
-						LoadedCubeWindow.Max.Y + 1, LoadedCubeWindow.Max.Y + Diff.Y + 1, 
+						LoadedCubeWindow.Max.Y + 1 + Excess, LoadedCubeWindow.Max.Y + Diff.Y + 1, 
 						true);
 	}
 	// shift left
@@ -198,8 +231,9 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 						LoadedCubeWindow.Max.Y + Diff.Y + 1, LoadedCubeWindow.Max.Y + 1, 
 						false);
 		// load:
+		const int32 Excess = FMath::Clamp(Diff.Y + 1 + CubeLoadRange.Y * 2, TNumericLimits<int32>::Min(), 0);
 		BufferOperation(LoadedCubeWindow.Min.X, LoadedCubeWindow.Max.X + 1, 
-						LoadedCubeWindow.Min.Y + Diff.Y, LoadedCubeWindow.Min.Y, 
+						LoadedCubeWindow.Min.Y + Diff.Y, LoadedCubeWindow.Min.Y + Excess, 
 						true);
 	}
 	
@@ -216,7 +250,8 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 						false);
 		
 		// load:
-		BufferOperation(LoadedCubeWindow.Max.X + 1, LoadedCubeWindow.Max.X + Diff.X + 1, 
+		const int32 Excess = FMath::Clamp(Diff.X - CubeLoadRange.X * 2 - 1, 0, TNumericLimits<int32>::Max());
+		BufferOperation(LoadedCubeWindow.Max.X + 1 + Excess, LoadedCubeWindow.Max.X + Diff.X + 1,
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Max.Y + 1, 
 						true);
 	}
@@ -229,13 +264,16 @@ void AZXPawn::BufferCubes(int32 OldLocation, int32 NewLocation)
 						false);
 		
 		// load:
-		BufferOperation(LoadedCubeWindow.Min.X + Diff.X, LoadedCubeWindow.Min.X, 
+		const int32 Excess = FMath::Clamp(Diff.X + 1 + CubeLoadRange.X * 2, TNumericLimits<int32>::Min(), 0);
+		BufferOperation(LoadedCubeWindow.Min.X + Diff.X, LoadedCubeWindow.Min.X + Excess, 
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Max.Y + 1, 
 						true);
 	}
 	
 	// finish the window shift:
 	LoadedCubeWindow = LoadedCubeWindow.ShiftBy(FIntPoint(Diff.X, 0));
+	
+	LOGZXSCR("CubeBuffer_Load=%d | CubeBuffer_Unload=%d", CubeBuffer_Load.Num(), CubeBuffer_Unload.Num());
 }
 
 void AZXPawn::BufferLoad(int32 InIdx)

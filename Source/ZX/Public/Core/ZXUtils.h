@@ -37,11 +37,21 @@ public:
 	static UZXAssetManager* GetZXAssetManager();
 
 	UFUNCTION(BlueprintCallable)
-	static UUIDelegates* GetUIDelegates(const UObject* WorldContextObject);
+	static UUIDelegates* GetUIDelegates(const UObject* WorldContextObject, bool bLogError = true);
 };
 
 UCLASS()
 class ZX_API UUIDelegates : public UObject
 {
 	GENERATED_BODY()
+	
+public:
+	/*
+	 * Map:
+	 */
+	FSimpleMulticastDelegate OnMapGenerationComplete;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapOpened, FVector WorldLocation) FOnMapOpened OnMapOpened;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapClosed, FIntPoint CoordFromMap) FOnMapClosed OnMapClosed;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapZoom, float ZoomAmount) FOnMapZoom OnMapZoom;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FMapGridMove, FIntPoint InMovementInput) FMapGridMove OnMapGridMove;
 };

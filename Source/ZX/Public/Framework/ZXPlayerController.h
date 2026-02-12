@@ -29,6 +29,7 @@ public:
 	virtual void SetupInputComponent() override;
 	
 	void Move(const FInputActionValue& InActionValue);
+	void GridMove(const FInputActionValue& InActionValue);
 	void FollowGridPawn(const FInputActionValue& InActionValue);
 	void UnfollowGridPawn(const FInputActionValue& InActionValue);
 	void CommandMoveTo(const FInputActionValue& InActionValue);
@@ -41,10 +42,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputMappingContext* ZXMappingContext;
 
-	// handles move action
 	// Input Actions:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IAMove;
+	
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IAGridMove;
 	
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IACameraFollow;
@@ -61,14 +64,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IACameraZoomOut;
 
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IAOpenMap;
+	
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomSpeed = 1.f;
 
+	// how much to zoom per scroll:
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomAmount = 100.f;
 	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomMin = 300.f;
+	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float ZoomMax = 1300.f;
+	
 	void OnZoomIn();
 	void OnZoomOut();
+	void OnMapPressed();
 	
 	AGridPawn* GetCameraGridPawn() const;
 	AGridPawn* SetCameraGridPawn(AGridPawn* GPawn);
@@ -91,4 +105,10 @@ private:
 	//Pawn the camera is currently following
 	UPROPERTY()
 	AGridPawn* CameraFollowPawn = nullptr;
+	
+	// current camera zoom, is clamped by min/max
+	float CurrentZoom = 0.f;
+	
+	// map is managed through zoom. we broadcast open, listen for close:
+	bool bIsWorldMapOpen = false;
 };

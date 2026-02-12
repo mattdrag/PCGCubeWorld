@@ -30,6 +30,7 @@ void UGridManagerComponent::BeginPlay()
 void UGridManagerComponent::InitData()
 {
 	GridTiles.Empty();
+	bIsDataGenerated = false;
 
 	SetSeed(GridSeed);
 }
@@ -45,16 +46,22 @@ FGridTile* UGridManagerComponent::GetGridTile(const int32 InIndex)
 	return nullptr;
 }
 
-FGridTile* UGridManagerComponent::GetGridTile(const FIntPoint& InCoordinates)
+FGridTile* UGridManagerComponent::GetGridTile(int32 X, int32 Y)
 {
 	// check grid bounds:
-	if (InCoordinates.X < 0 || InCoordinates.X >= Columns || InCoordinates.Y < 0 || InCoordinates.Y >= Rows)
+	if (X < 0 || X >= Columns || Y < 0 || Y >= Rows)
 	{
 		return nullptr;
 	}
 	
 	// Convert coords to index, then call our other function:
-	return GetGridTile(CoordinatesToIndex(InCoordinates));
+	return GetGridTile(CoordinatesToIndex(X,Y));
+}
+
+FGridTile* UGridManagerComponent::GetGridTile(const FIntPoint& InCoordinates)
+{
+	// break apart FIntPoint:
+	return GetGridTile(InCoordinates.X, InCoordinates.Y);
 }
 
 int32 UGridManagerComponent::CoordinatesToIndex(int32 X, int32 Y) const
@@ -107,6 +114,11 @@ int32 UGridManagerComponent::WorldToIndex(const FVector& InWorld) const
 	return CoordinatesToIndex(WorldToCoordinates(InWorld));
 }
 
+FVector UGridManagerComponent::SnapToGrid(const FVector& InWorldLocation) const
+{
+	return IndexToWorld(WorldToIndex(InWorldLocation));
+}
+
 TArray<FGridTile*> UGridManagerComponent::GetGridTilesInRadius(int32 OriginPoint, int32 Radius, bool bIncludeOrigin, bool bCheckIfOccupied)
 {
 	TArray<FGridTile*> RetArr;
@@ -125,7 +137,7 @@ TArray<FGridTile*> UGridManagerComponent::GetGridTilesInRadius(int32 OriginPoint
 	{
 		for (int32 j = -Radius; j < Radius; j++)
 		{
-			if (FGridTile* ThisGridTile = GetGridTile(FIntPoint(OriginCoords.X + i, OriginCoords.Y + j)))
+			if (FGridTile* ThisGridTile = GetGridTile(OriginCoords.X + i, OriginCoords.Y + j))
 			{
 				if (bCheckIfOccupied && ThisGridTile->IsOccupied())
 				{
@@ -164,11 +176,16 @@ bool UGridManagerComponent::GenerateGridData()
 		{
 			// Init with our current seed:
 			FMath::RandInit(GridRandom.GetCurrentSeed());
-
-			// Perlin noise:
-			const float MoistureVal = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
-			const ETileType RandomType = MoistureVal >= MoistureThresh_Grass ? ETileType::Grass : ETileType::Dirt;
-			GridTiles.Add(FGridTile(RandomType, MoistureVal, i * Columns + j));
+			
+			// todo: once we have more biomes, get actual biome
+			const EBiome ChosenBiome = EBiome::TestGrasslands;
+			
+			// Make a tile:
+			FGridTile NewTile(i * Columns + j);
+			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
+			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
+			NewTile.Biome = ChosenBiome;
+			GridTiles.Add(NewTile);
 		}
 	}
 
@@ -205,9 +222,9 @@ void UGridManagerComponent::CellularAutomataStep()
 		if (GridTile.Type == ETileType::Grass && NumDirt > 4)
 		{
 			// grass dies:
-			NextGen.Add(ETileType::Dirt);
+			NextGen.Add(ETileType::Sand);
 		}
-		else if (GridTile.Type == ETileType::Dirt && NumGrass > 4)
+		else if (GridTile.Type == ETileType::Sand && NumGrass > 4)
 		{
 			// grass grows:
 			NextGen.Add(ETileType::Grass);
@@ -230,20 +247,6 @@ void UGridManagerComponent::CellularAutomataStep()
 
 		GridTiles[i].Type = NextGen[i];
 	}
-}
-
-bool UGridManagerComponent::GenerateWater()
-{
-	for (FGridTile& GridTile : GridTiles)
-	{
-		// Dirt becomes water:
-		if (GridTile.Type == ETileType::Dirt)
-		{
-			GridTile.Type = ETileType::Water;
-		}
-	}
-	
-	return true;
 }
 
 bool UGridManagerComponent::DestroyGrid()
@@ -284,10 +287,12 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 		CellularAutomataStep();
 	}
 	
-	// 3. Water:
-	if (!GenerateWater())
+
+	// Completed:
+	bIsDataGenerated = true;
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
 	{
-		return false;
+		UIDelegates->OnMapGenerationComplete.Broadcast();
 	}
 
 	return true;
