@@ -49,6 +49,7 @@ protected:
 	
 	// helper that transforms coord systems. anytime we receive coords from grid we should call this initially:
 	FORCEINLINE FIntPoint GridToMap(const FIntPoint& InGridCoords) const { return FIntPoint(InGridCoords.Y, -InGridCoords.X); }
+	FORCEINLINE FIntPoint MapToGrid(const FIntPoint& InMapCoords) const { return FIntPoint(-InMapCoords.Y, InMapCoords.X); }
 	
 	// helper for setting uvs in material:
 	void SetMapUVs(const FVector2D& InMapUVs);

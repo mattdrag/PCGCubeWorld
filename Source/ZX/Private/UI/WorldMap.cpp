@@ -75,7 +75,7 @@ void UWorldMap::NativeDestruct()
 		}
 	}
 	
-	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this, false))
 	{
 		UIDelegates->OnMapOpened.RemoveAll(this);
 		UIDelegates->OnMapGenerationComplete.RemoveAll(this);
@@ -223,7 +223,7 @@ void UWorldMap::CloseMap()
 	// tell PC to give zoom input back to camera:
 	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
 	{
-		UIDelegates->OnMapClosed.Broadcast();
+		UIDelegates->OnMapClosed.Broadcast(GridMidpoint + MapToGrid(MyGridLoc - GridMidpoint));
 	}
 	// for dissolve out:
 	bIsMapOpening = false;

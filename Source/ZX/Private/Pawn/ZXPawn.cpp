@@ -32,6 +32,15 @@ AZXPawn::AZXPawn()
 void AZXPawn::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	// delegates:
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this))
+	{
+		UIDelegates->OnMapClosed.AddLambda([&](FIntPoint NewGridCoord)
+		{
+			SetGridLocation(NewGridCoord);
+		});
+	}
 
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
 	if (!IsValid(GridManager))
@@ -65,8 +74,27 @@ void AZXPawn::BeginPlay()
 	LoadedCubeWindow = FBox2D(LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y)*-1, LastGridLocation + FIntPoint(CubeLoadRange.X, CubeLoadRange.Y));
 }
 
+void AZXPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (auto UIDelegates = UZXUtils::GetUIDelegates(this, false))
+	{
+		UIDelegates->OnMapClosed.RemoveAll(this);
+	}
+	
+	Super::EndPlay(EndPlayReason);
+}
+
 void AZXPawn::SetGridLocation(const FIntPoint& InGridCoord)
 {
+	UGridManagerComponent* GridManager = CachedGridManager.Get();
+	if (!IsValid(GridManager))
+	{
+		LOGZXEF("grid manager invalid..");
+		return;
+	}
+	
+	SetActorLocation(GridManager->CoordinatesToWorld(InGridCoord));
+	
 	// todo: instantly blocking load?
 }
 

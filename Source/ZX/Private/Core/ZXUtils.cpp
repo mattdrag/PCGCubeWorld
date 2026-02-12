@@ -82,13 +82,17 @@ UZXAssetManager* UZXUtils::GetZXAssetManager()
 	return nullptr;
 }
 
-UUIDelegates* UZXUtils::GetUIDelegates(const UObject* WorldContextObject)
+UUIDelegates* UZXUtils::GetUIDelegates(const UObject* WorldContextObject, bool bLogError)
 {
 	if (AZXPlayerController* PC = GetZXController(WorldContextObject))
 	{
 		return PC->UIDelegates;
 	}
 
-	LOGZXE("Failed to get UIDelegates..");
+	if (bLogError)
+	{
+		LOGZXE("Failed to get UIDelegates..");
+	}
+	
 	return nullptr;
 }

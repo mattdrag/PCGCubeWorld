@@ -29,7 +29,7 @@ void AZXPlayerController::BeginPlay()
 	// We listen for map closing (broadcasted by worldmap):
 	if (IsValid(UIDelegates))
 	{
-		UIDelegates->OnMapClosed.AddLambda([&]()
+		UIDelegates->OnMapClosed.AddLambda([&](FIntPoint UnusedLoc)
 		{
 			bIsWorldMapOpen = false;
 		});
