@@ -36,6 +36,27 @@ void AZXPlayerController::BeginPlay()
 	}
 }
 
+void AZXPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE(AZXPlayerController_Tick);
+	
+	// TODO: mouse hover:
+	
+	// Follow controlled pawn:
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
+	{
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (IsValid(MyPawn))
+		{
+			// Lerp MyPawn to ControlledPawn:
+			const FVector LerpedLoc = FMath::Lerp(MyPawn->GetActorLocation(), LocalControlledGridPawn->GetActorLocation(), DeltaSeconds * ControlledPawnInterpSpeed);
+			MyPawn->SetActorLocation(FVector(LerpedLoc.X, LerpedLoc.Y, MyPawn->GetActorLocation().Z));
+		}
+	}
+}
+
 void AZXPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -104,12 +125,12 @@ void AZXPlayerController::Move(const FInputActionValue& InActionValue)
 	// Send input to camera:
 	else
 	{
-		AZXPawn* CameraPawn = UZXUtils::GetZXPawn(this);
-		if (!IsValid(CameraPawn))
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (!IsValid(MyPawn))
 		{
 			return;
 		}
-		CameraPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), CameraPawn->MovementSpeed);
+		MyPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), MyPawn->MovementSpeed);
 	}
 }
 
@@ -119,7 +140,7 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
 	const FIntPoint IntegerInput = FIntPoint(Input.X, Input.Y);
 	
-	AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+	AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
 	if (IsValid(MyPawn) && IsValid(GridManager))
 	{
@@ -235,7 +256,7 @@ void AZXPlayerController::OnZoomOut()
 			if (TargetZoom > CurrentZoom)
 			{
 				bIsWorldMapOpen = true;
-				AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+				AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
 				if (IsValid(MyPawn) && IsValid(UIDelegates))
 				{
 					UIDelegates->OnMapOpened.Broadcast(MyPawn->GetActorLocation());

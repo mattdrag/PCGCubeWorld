@@ -94,8 +94,6 @@ void AZXPawn::SetGridLocation(const FIntPoint& InGridCoord)
 	}
 	
 	SetActorLocation(GridManager->CoordinatesToWorld(InGridCoord));
-	
-	// todo: instantly blocking load?
 }
 
 // Called every frame
@@ -105,10 +103,7 @@ void AZXPawn::Tick(float DeltaTime)
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(AZXPawn_Tick);
 	
-	// for debugging:
-	//LOGZX("LoadedCubes=[%d] | BufferLoad=[%d] | BufferUnload=[%d]", LoadedCubes.Num(), CubeBuffer_Load.Num(), CubeBuffer_Unload.Num());
-	//LOGZX("%d,%d", GridManager->IndexToCoordinates(CurrentGridLocation).X, GridManager->IndexToCoordinates(CurrentGridLocation).Y);
-	
+	// Cube loading:
 	UGridManagerComponent* GridManager = CachedGridManager.Get();
 	if (IsValid(GridManager))
 	{

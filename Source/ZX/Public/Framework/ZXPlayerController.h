@@ -22,7 +22,8 @@ public:
 	AZXPlayerController();
 	
 	virtual void BeginPlay() override;
-
+	virtual void Tick(float DeltaSeconds) override;
+	
 	virtual void OnPossess(APawn* InPawn) override;
 	
 	// Called to bind functionality to input
@@ -75,6 +76,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomMax = 1300.f;
+	
+	UPROPERTY(EditAnywhere, Category = Control)
+	float ControlledPawnInterpSpeed = 8.f;
 	
 	void OnZoomIn();
 	void OnZoomOut();
