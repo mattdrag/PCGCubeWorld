@@ -11,6 +11,7 @@
 #include "GridManagerComponent.generated.h"
 
 
+class AZXSprite;
 class UBiomeData;
 
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -50,7 +51,7 @@ public:
 	FORCEINLINE int32 GetNumRows() const { return Rows; }
 	FORCEINLINE int32 GetNumColumns() const { return Columns; }
 	FORCEINLINE FIntPoint GetGridMidpoint() const { return FIntPoint(Rows/2, Columns/2); }
-	FORCEINLINE float GetZHeight() const { return CubeSize; }
+	FORCEINLINE float GetGridHeight() const { return GridHeight; }
 	
 	
 	// Grid Generation:
@@ -102,6 +103,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
+	// TODO: we may expand on this concept with multiple grids..
+	float GridHeight = 0.f;
+	
 #pragma region Styling 
 	void LoadBiomes();
 	ETileType DetermineTileType(EBiome InBiome, float InAltitude);
@@ -109,12 +113,16 @@ protected:
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
+	void SpawnFoliage(const UBiomeData& InBiome, const FVector& InWorldLoc);
 	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
 
 	float PerlinNoiseZX(const FVector2D& Location);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
 	TArray<uint8> BitmaskToTileStyle;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Styling")
+	TSubclassOf<AZXSprite> FoliageClass;
 #pragma endregion Styling
 	
 private:

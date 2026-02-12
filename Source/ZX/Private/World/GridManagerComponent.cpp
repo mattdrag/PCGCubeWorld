@@ -91,7 +91,7 @@ FVector UGridManagerComponent::CoordinatesToWorld(const FIntPoint& InCoordinate)
 	// in order for 0,0 to be center of the world, we offset the x and y based on grid dimensions:
 	const float OffsetX = Columns / 2;
 	const float OffsetY = Rows / 2;
-	return FVector(InCoordinate.X * CubeSize - OffsetX * CubeSize, InCoordinate.Y * CubeSize - OffsetY * CubeSize, CubeSize);
+	return FVector(InCoordinate.X * CubeSize - OffsetX * CubeSize, InCoordinate.Y * CubeSize - OffsetY * CubeSize, GridHeight);
 }
 
 FVector UGridManagerComponent::IndexToWorld(int32 InIndex) const
@@ -413,7 +413,7 @@ void UGridManagerComponent::PlacePawnOnGrid(AGridPawn* GridPawn, FGridTile* Grid
 	const FIntPoint CubeLoc = IndexToCoordinates(GridTile->MyIndex);
 	const FVector CubeLocWorld = CoordinatesToWorld(CubeLoc);
 	// const FVector BoostedLoc = CubeLocWorld + FVector(0, 0, CubeSize);
-	const FVector BoostedLoc = CubeLocWorld + FVector(0, 0, 0);
+	const FVector BoostedLoc = CubeLocWorld + FVector(0, 0, GridHeight);
 	GridPawn->SetActorLocation(BoostedLoc);
 	GridPawnAIC->InitialGridTile = GridTile->MyIndex;
 

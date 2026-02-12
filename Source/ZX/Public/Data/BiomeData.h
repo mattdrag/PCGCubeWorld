@@ -7,6 +7,7 @@
 #include "World/GridTypes.h"
 #include "BiomeData.generated.h"
 
+class UPaperSprite;
 class UTileSetData;
 /**
  * 
@@ -36,10 +37,10 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
 	TArray<UTexture*> Grass;
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
-	TArray<UTexture*> Foliage;
-
+	TArray<UPaperSprite*> Foliage;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
 	TArray<UTexture*> Water;
 

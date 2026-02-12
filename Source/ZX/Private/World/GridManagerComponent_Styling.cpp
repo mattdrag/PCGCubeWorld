@@ -4,10 +4,13 @@
 #include "World/GridTypes.h"
 #include "World/GridManagerComponent.h"
 #include "World/ZXCube.h"
+#include "World/ZXSprite.h"
 
 namespace GridManagerStylingConsts
  {
  	constexpr int32 NumFoliageSlots = 8;
+	
+	const FName SpawnedFoliageFolder = FName("Foliage");
  }
 
 void UGridManagerComponent::LoadBiomes()
@@ -57,6 +60,38 @@ ETileType UGridManagerComponent::DetermineTileType(EBiome InBiome, float InAltit
 		return ETileType::Sand;
 	}
 	return (*CurrentBiome)->TileTypeConfig.BaseType;
+}
+
+void UGridManagerComponent::SpawnFoliage(const UBiomeData& InBiome, const FVector& InWorldLoc)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+	const int32 FoliageIdx = FMath::RandRange(0, InBiome.Foliage.Num() - 1);
+	if (InBiome.Foliage.IsEmpty() || !InBiome.Foliage.IsValidIndex(FoliageIdx))
+	{
+		LOGZXWF("Biome %s has no foliage..", *InBiome.DisplayName.ToString());
+		return;
+	}
+	
+	// TODO: get random weighted index
+		
+	// Spawn a foliage sprite at location:
+	AZXSprite* SpawnedFoliage = World->SpawnActor<AZXSprite>(FoliageClass, InWorldLoc, FRotator::ZeroRotator);
+	
+	// Spawn:
+	if (!IsValid(SpawnedFoliage))
+	{
+		LOGZXWF("Failed to spawn foliage (%f,%f,%f)", InWorldLoc.X, InWorldLoc.Y, InWorldLoc.Z);
+		return;
+	}
+
+	// Put it in a folder for easier viewing of world outliner:
+	SpawnedFoliage->SetFolderPath(GridManagerStylingConsts::SpawnedFoliageFolder);
+	
+	SpawnedFoliage->SetSprite(InBiome.Foliage[FoliageIdx]);
 }
 
 void UGridManagerComponent::StyleCube(AZXCube* InCube)
@@ -127,17 +162,9 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 			for (int32 i = 0; i < NumFoliage; i++)
 			{
 				const FVector2D& FoliageUV = FoliageUVs[i];
-		
-				// TODO: get random weighted index
-				const int32 FoliageIdx = FMath::RandRange(0, (*CurrentBiome)->Foliage.Num() - 1);
-		
-				// Set material params:
-				const FString FoliageStr = FString::Printf(TEXT("Foliage%d"), i);
-				const FString FoliageUStr = FString::Printf(TEXT("Foliage%dU"), i);
-				const FString FoliageVStr = FString::Printf(TEXT("Foliage%dV"), i);
-				DynCubeMat->SetTextureParameterValue(FName(*FoliageStr), (*CurrentBiome)->Foliage[FoliageIdx]);
-				DynCubeMat->SetScalarParameterValue(FName(*FoliageUStr), FoliageUV.X);
-				DynCubeMat->SetScalarParameterValue(FName(*FoliageVStr), FoliageUV.Y);
+				const FVector CubeLoc = InCube->GetActorLocation();
+				const FVector FoliageLoc = FVector(CubeLoc.X + FoliageUV.X * CubeSize, CubeLoc.Y + FoliageUV.Y * CubeSize, CubeLoc.Z);
+				SpawnFoliage(**CurrentBiome, FoliageLoc);
 			}
 		}
 		
