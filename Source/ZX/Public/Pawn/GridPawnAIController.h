@@ -20,13 +20,16 @@ public:
 
 	virtual void BeginPlay() override;
 
+	// todo: this will be more complicated state in the future:
+	bool bIsControlled = false;
+	FORCEINLINE void SetControlled(bool InControlled);
+	
 	void Command_MoveTo(const FVector& NewLocation);
 
 	// Where did we start on the grid?
 	int32 InitialGridTile = 0;
 	
 protected:
-	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<UStateTreeAIComponent> StateTree;
 };

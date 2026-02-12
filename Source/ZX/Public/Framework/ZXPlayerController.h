@@ -30,8 +30,7 @@ public:
 	
 	void Move(const FInputActionValue& InActionValue);
 	void GridMove(const FInputActionValue& InActionValue);
-	void FollowGridPawn(const FInputActionValue& InActionValue);
-	void UnfollowGridPawn(const FInputActionValue& InActionValue);
+	void ControlGridPawn(const FInputActionValue& InActionValue);
 	void CommandMoveTo(const FInputActionValue& InActionValue);
 
 	/*
@@ -50,10 +49,7 @@ public:
 	UInputAction* IAGridMove;
 	
 	UPROPERTY(EditAnywhere, Category = Input)
-	UInputAction* IACameraFollow;
-
-	UPROPERTY(EditAnywhere, Category = Input)
-	UInputAction* IACameraUnfollow;
+	UInputAction* IATakeControl;
 	
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IACommandMoveTo;
@@ -84,8 +80,8 @@ public:
 	void OnZoomOut();
 	void OnMapPressed();
 	
-	AGridPawn* GetCameraGridPawn() const;
-	AGridPawn* SetCameraGridPawn(AGridPawn* GPawn);
+	void ControlGridPawn(AGridPawn* InPawn);
+	AGridPawn* GetControlledGridPawn() const { return ControlledGridPawn.Get(); }
 
 	UPROPERTY()
 	TObjectPtr<UUIDelegates> UIDelegates;
@@ -102,9 +98,7 @@ protected:
 	void DebugAttackEveryone();
 	
 private:
-	//Pawn the camera is currently following
-	UPROPERTY()
-	AGridPawn* CameraFollowPawn = nullptr;
+	TWeakObjectPtr<AGridPawn> ControlledGridPawn;
 	
 	// current camera zoom, is clamped by min/max
 	float CurrentZoom = 0.f;

@@ -76,8 +76,7 @@ void AZXPlayerController::SetupInputComponent()
 	// Bind Actions:
 	EnhancedInputComp->BindAction(IAMove, ETriggerEvent::Triggered, this, &AZXPlayerController::Move);
 	EnhancedInputComp->BindAction(IAGridMove, ETriggerEvent::Started, this, &AZXPlayerController::GridMove);
-	EnhancedInputComp->BindAction(IACameraFollow, ETriggerEvent::Completed, this, &ThisClass::FollowGridPawn);
-	EnhancedInputComp->BindAction(IACameraUnfollow, ETriggerEvent::Completed, this, &ThisClass::UnfollowGridPawn);
+	EnhancedInputComp->BindAction(IATakeControl, ETriggerEvent::Started, this, &ThisClass::ControlGridPawn);
 	EnhancedInputComp->BindAction(IACommandMoveTo, ETriggerEvent::Completed, this, &ThisClass::CommandMoveTo);
 	EnhancedInputComp->BindAction(IACameraZoomIn, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomIn);
 	EnhancedInputComp->BindAction(IACameraZoomOut, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomOut);
@@ -145,40 +144,36 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 	}
 }
 
-void AZXPlayerController::FollowGridPawn(const FInputActionValue& InActionValue)
+void AZXPlayerController::ControlGridPawn(const FInputActionValue& InActionValue)
 {
-	// Toggle the check to follow the grid pawn
-
+	// if we already control a guy, uncontrol him.
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
+	{
+		ControlGridPawn(nullptr);
+	}
+	
+	// Get pawns under cursor:
 	FHitResult Hit;
 	GetHitResultUnderCursorByChannel(SelectionTraceChannel, false, Hit);
-	AGridPawn* GPawn = Cast<AGridPawn>(Hit.GetActor());
-	if (!IsValid(GPawn))
+	AGridPawn* HitGridPawn = Cast<AGridPawn>(Hit.GetActor());
+	if (IsValid(HitGridPawn))
 	{
-		UE_LOG(LogZX, Error, TEXT("Attempting to follow non gridpawn"));
-		return;
+		// control the hitres
+		ControlGridPawn(HitGridPawn);
 	}
-	SetCameraGridPawn(GPawn);
-}
-
-void AZXPlayerController::UnfollowGridPawn(const FInputActionValue& InActionValue)
-{
-	SetCameraGridPawn(nullptr);
 }
 
 void AZXPlayerController::CommandMoveTo(const FInputActionValue& InActionValue)
 {
-	// Tell brain of guy we are looking at where to go:
-
-	// are we looking at a guy?
-	if (AGridPawn* TheGuyWeAreLookingAt = GetCameraGridPawn())
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
 	{
-		if (AGridPawnAIController* GPAIC = Cast<AGridPawnAIController>(TheGuyWeAreLookingAt->Controller))
+		if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(LocalControlledGridPawn->Controller))
 		{
 			// yes, hit scan for cube:
 			FHitResult Hit;
 			if (GetHitResultUnderCursorByChannel(CommandTraceChannel, false, Hit))
 			{
-				GPAIC->Command_MoveTo(Hit.Location);
+				AIC->Command_MoveTo(Hit.Location);
 			}
 		}
 	}
@@ -255,15 +250,31 @@ void AZXPlayerController::OnMapPressed()
 	// TODO: for now, only trigger map through zooming..
 }
 
-AGridPawn* AZXPlayerController::GetCameraGridPawn() const
+void AZXPlayerController::ControlGridPawn(AGridPawn* InPawn)
 {
-	return CameraFollowPawn;
-}
-
-AGridPawn* AZXPlayerController::SetCameraGridPawn(AGridPawn* GPawn)
-{
-	CameraFollowPawn = GPawn;
-	return CameraFollowPawn;
+	// gain control:
+	if (IsValid(InPawn))
+	{
+		if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(InPawn->Controller))
+		{
+			AIC->SetControlled(true);
+		}
+	}
+	
+	// lose control:
+	else
+	{
+		AGridPawn* PrevControlledPawn = ControlledGridPawn.Get();
+		if (IsValid(PrevControlledPawn))
+		{
+			if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(PrevControlledPawn->Controller))
+			{
+				AIC->SetControlled(false);
+			}
+		}
+	}
+	
+	ControlledGridPawn = InPawn;
 }
 
 void AZXPlayerController::DebugAttackEveryone()
