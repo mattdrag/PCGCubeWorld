@@ -46,6 +46,7 @@ protected:
 	
 	// translate world grid to map uvs
 	FVector2D GridCoordsToMapUVs(const FIntPoint& InGridCoords);
+	FIntPoint MapUVsToGridCoords(const FVector2D& InUVs);
 	
 	// helper that transforms coord systems. anytime we receive coords from grid we should call this initially:
 	FORCEINLINE FIntPoint GridToMap(const FIntPoint& InGridCoords) const { return FIntPoint(InGridCoords.Y, -InGridCoords.X); }

@@ -135,16 +135,9 @@ FReply UWorldMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerE
 			const FVector2D DragDelta = LastDragPos - NewDragPos; 
 			LastDragPos = NewDragPos;
 			
-			// shift UVs:
-			if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
-			{
-				// drag speed scales with UVs:
-				MapUVs += DragDelta / UVScale * WorldMapConsts::UVScaleMulti;
-				MapMaterial->SetScalarParameterValue("OffsetU", MapUVs.X);
-				MapMaterial->SetScalarParameterValue("OffsetV", MapUVs.Y);
-				
-				LOGZXSCREEN("UVScale= %f | UVs= %f,%f | MapImageScale= %f", UVScale, MapUVs.X, MapUVs.Y, MapImageScale);
-			}
+			// drag speed scales with UVs:
+			SetMapUVs(MapUVs + DragDelta / UVScale * WorldMapConsts::UVScaleMulti);
+			MyGridLoc = MapUVsToGridCoords(MapUVs);
 		}
 		return FReply::Handled();
 	}
@@ -196,6 +189,7 @@ void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 	// todo: derive a formula. for now: midpoint diff method;
 	const FIntPoint GridSpaceCoords = GridManager->WorldToCoordinates(InWorldLocation);
 	const FIntPoint MidDiff = GridSpaceCoords - GridMidpoint;
+	
 	MyGridLoc = GridMidpoint + GridToMap(MidDiff);
 	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
 }
@@ -203,7 +197,6 @@ void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 void UWorldMap::HandleMapGridMove(FIntPoint NewGridCoords)
 {
 	MyGridLoc += GridToMap(NewGridCoords);
-	
 	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
 }
 
@@ -332,16 +325,31 @@ void UWorldMap::OnViewportResized(FViewport* Viewport, uint32 UnusedInt)
 
 FVector2D UWorldMap::GridCoordsToMapUVs(const FIntPoint& InGridCoords)
 {
+	const FIntPoint GridBounds = GridMidpoint * 2;
+	const float ZoomMulti = (UVScale + AdditionalZoom) / InitialZoom / 2.f;
+	
 	// We dont wanna point top left edge of tile, we wanna be in the middle:
 	const FVector2D HalfwayGridCoords = FVector2D(InGridCoords.X + 0.5f, InGridCoords.Y - 0.5f);
 	
 	// remap UV range goes from [-1, 1]
 	// y = 2x - 1
-	const FIntPoint GridBounds = GridMidpoint * 2;
-	const float RemappedU = (2 * (HalfwayGridCoords.X * 1.f / GridBounds.X) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
-	const float RemappedV = (2 * (HalfwayGridCoords.Y * 1.f / GridBounds.Y) - 1) * (UVScale + AdditionalZoom) / InitialZoom / 2;
+	const float RemappedU = (2 * (HalfwayGridCoords.X * 1.f / GridBounds.X) - 1) * ZoomMulti;
+	const float RemappedV = (2 * (HalfwayGridCoords.Y * 1.f / GridBounds.Y) - 1) * ZoomMulti;
 	
 	return FVector2D(RemappedU, RemappedV);
+}
+
+FIntPoint UWorldMap::MapUVsToGridCoords(const FVector2D& InUVs)
+{
+	const FIntPoint GridBounds = GridMidpoint * 2;
+	const float ZoomMulti = (UVScale + AdditionalZoom) / InitialZoom / 2.f;
+	
+	// inverse of GridCoordsToMap UVs:
+	// x = (y + 1) / 2
+	const float RemappedX = ((InUVs.X / ZoomMulti + 1.f) / 2.f * GridBounds.X) - 0.5f;
+	const float RemappedY = ((InUVs.Y / ZoomMulti + 1.f) / 2.f * GridBounds.Y) + 0.5f;
+
+	return FIntPoint(FMath::RoundToInt(RemappedX), FMath::RoundToInt(RemappedY));
 }
 
 void UWorldMap::HandleMapZoom(float ZoomInput)

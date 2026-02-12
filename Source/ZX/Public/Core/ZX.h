@@ -18,7 +18,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogZX, Log, All);
 #define LOGZXEF(Format, ...) UE_LOG(LogZX, Error, TEXT("%s : " Format), ANSI_TO_TCHAR(__FUNCTION__), ##__VA_ARGS__)
 
 // for debugging:
-#define LOGZXSCREEN(Format, ...) \
+#define LOGZXSCR(Format, ...) \
 if (GEngine) \
 { \
 	GEngine->AddOnScreenDebugMessage( \

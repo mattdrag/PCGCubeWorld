@@ -145,7 +145,7 @@ void AZXPawn::Tick(float DeltaTime)
 			LocalLoadedCubes.Reserve(LoadedCubesPerFrame);
 			for (const int32 CubeIdx : CubeBuffer_Load)
 			{
-				GridManager->SpawnCube(CubeIdx, LocalMarkedCubes[i]);
+				GridManager->SpawnCube(CubeIdx, LocalMarkedCubes.IsValidIndex(i) ? LocalMarkedCubes[i] : -1);
 				LoadedCubes.Add(CubeIdx);
 				LocalLoadedCubes.Add(CubeIdx);
 				i++;
@@ -196,6 +196,8 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 	// loading window slides to new location, get new box, then take the difference:
 	const FIntPoint Diff = NewLocation - OldLocation;
 	
+	// NOTE: fix the excess window sliding problem where going beyond a full window will cause load buffer to overflow with the extra.
+	
 	auto BufferOperation = [&](int32 XMin, int32 XMax, int32 YMin, int32 YMax, bool bLoad)
 	{
 		for (int32 x = XMin; x < XMax; x++)
@@ -216,8 +218,9 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Min.Y + Diff.Y, 
 						false);
 		// load:
+		const int32 Excess = FMath::Clamp(Diff.Y - CubeLoadRange.Y * 2 - 1, 0, TNumericLimits<int32>::Max());
 		BufferOperation(LoadedCubeWindow.Min.X, LoadedCubeWindow.Max.X + 1, 
-						LoadedCubeWindow.Max.Y + 1, LoadedCubeWindow.Max.Y + Diff.Y + 1, 
+						LoadedCubeWindow.Max.Y + 1 + Excess, LoadedCubeWindow.Max.Y + Diff.Y + 1, 
 						true);
 	}
 	// shift left
@@ -228,8 +231,9 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 						LoadedCubeWindow.Max.Y + Diff.Y + 1, LoadedCubeWindow.Max.Y + 1, 
 						false);
 		// load:
+		const int32 Excess = FMath::Clamp(Diff.Y + 1 + CubeLoadRange.Y * 2, TNumericLimits<int32>::Min(), 0);
 		BufferOperation(LoadedCubeWindow.Min.X, LoadedCubeWindow.Max.X + 1, 
-						LoadedCubeWindow.Min.Y + Diff.Y, LoadedCubeWindow.Min.Y, 
+						LoadedCubeWindow.Min.Y + Diff.Y, LoadedCubeWindow.Min.Y + Excess, 
 						true);
 	}
 	
@@ -246,7 +250,8 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 						false);
 		
 		// load:
-		BufferOperation(LoadedCubeWindow.Max.X + 1, LoadedCubeWindow.Max.X + Diff.X + 1, 
+		const int32 Excess = FMath::Clamp(Diff.X - CubeLoadRange.X * 2 - 1, 0, TNumericLimits<int32>::Max());
+		BufferOperation(LoadedCubeWindow.Max.X + 1 + Excess, LoadedCubeWindow.Max.X + Diff.X + 1,
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Max.Y + 1, 
 						true);
 	}
@@ -259,13 +264,16 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 						false);
 		
 		// load:
-		BufferOperation(LoadedCubeWindow.Min.X + Diff.X, LoadedCubeWindow.Min.X, 
+		const int32 Excess = FMath::Clamp(Diff.X + 1 + CubeLoadRange.X * 2, TNumericLimits<int32>::Min(), 0);
+		BufferOperation(LoadedCubeWindow.Min.X + Diff.X, LoadedCubeWindow.Min.X + Excess, 
 						LoadedCubeWindow.Min.Y, LoadedCubeWindow.Max.Y + 1, 
 						true);
 	}
 	
 	// finish the window shift:
 	LoadedCubeWindow = LoadedCubeWindow.ShiftBy(FIntPoint(Diff.X, 0));
+	
+	LOGZXSCR("CubeBuffer_Load=%d | CubeBuffer_Unload=%d", CubeBuffer_Load.Num(), CubeBuffer_Unload.Num());
 }
 
 void AZXPawn::BufferLoad(int32 InIdx)
