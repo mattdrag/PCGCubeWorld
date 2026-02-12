@@ -55,4 +55,5 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapZoom, float ZoomAmount) FOnMapZoom OnMapZoom;
 	DECLARE_MULTICAST_DELEGATE_OneParam(FMapMove, FVector2D InMovementInput) FMapMove OnMapMove;
 	DECLARE_MULTICAST_DELEGATE_OneParam(FMapGridMove, FIntPoint InMovementInput) FMapGridMove OnMapGridMove;
+	DECLARE_MULTICAST_DELEGATE_OneParam(FMapDragMove, FVector2D InMovementInput) FMapDragMove OnMapDragMove;
 };

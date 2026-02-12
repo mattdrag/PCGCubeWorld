@@ -13,7 +13,7 @@ namespace WorldMapConsts
 	constexpr float DissolveHidden = 1.f;
 	constexpr float DissolveVisible = 0.f;
 	
-	constexpr float UVScaleMulti = 0.0001;
+	constexpr float UVScaleMulti = 0.0002;
 }
 
 void UWorldMap::NativeOnInitialized()
@@ -39,6 +39,7 @@ void UWorldMap::NativeOnInitialized()
 		UIDelegates->OnMapZoom.AddUObject(this, &ThisClass::HandleMapZoom);
 		UIDelegates->OnMapMove.AddUObject(this, &ThisClass::HandleMapMove);
 		UIDelegates->OnMapGridMove.AddUObject(this, &ThisClass::HandleMapGridMove);
+		UIDelegates->OnMapDragMove.AddUObject(this, &ThisClass::HandleMapDragMove);
 		
 		// Map listens for open, broadcasts close:
 		UIDelegates->OnMapOpened.AddUObject(this, &ThisClass::HandleMapOpened);
@@ -83,6 +84,7 @@ void UWorldMap::NativeDestruct()
 		UIDelegates->OnMapZoom.RemoveAll(this);
 		UIDelegates->OnMapMove.RemoveAll(this);
 		UIDelegates->OnMapGridMove.RemoveAll(this);
+		UIDelegates->OnMapDragMove.RemoveAll(this);
 	}
 	
 	Super::NativeDestruct();
@@ -113,59 +115,6 @@ void UWorldMap::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 }
 
-FReply UWorldMap::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	// LMB triggers drag:
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
-	{
-		bIsDraggingMap = true;
-		LastDragPos = InMouseEvent.GetScreenSpacePosition();
-		return FReply::Handled();
-	}
-	
-	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
-}
-
-FReply UWorldMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if (bIsDraggingMap)
-	{
-		const FVector2D NewDragPos = InMouseEvent.GetScreenSpacePosition();
-		if (NewDragPos != LastDragPos)
-		{
-			// Get delta:
-			const FVector2D DragDelta = LastDragPos - NewDragPos; 
-			LastDragPos = NewDragPos;
-			
-			// drag speed scales with UVs:
-			SetMapUVs(MapUVs + DragDelta / UVScale * WorldMapConsts::UVScaleMulti);
-			MyGridLoc = MapUVsToGridCoords(MapUVs);
-		}
-		return FReply::Handled();
-	}
-
-	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-}
-
-FReply UWorldMap::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	// release LMB ends drag:
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
-	{
-		bIsDraggingMap = false;
-		return FReply::Handled();
-	}
-	
-	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
-}
-
-void UWorldMap::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
-{
-	Super::NativeOnMouseLeave(InMouseEvent);
-	
-	bIsDraggingMap = false;
-}
-
 void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 {
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
@@ -176,7 +125,7 @@ void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 	
 	// tick uses this bool to handle fading in:
 	bIsMapOpening = true;
-	SetVisibility(ESlateVisibility::Visible);
+	SetVisibility(ESlateVisibility::HitTestInvisible);
 	
 	// Initialize scale:
 	AdditionalZoom = 0.f;
@@ -208,6 +157,14 @@ void UWorldMap::HandleMapGridMove(FIntPoint InMovementInput)
 {
 	MyGridLoc += GridToMap(InMovementInput);
 	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
+}
+
+void UWorldMap::HandleMapDragMove(FVector2D InMovementInput)
+{
+	// drag speed scales with UVs:
+	FVector2D FixedInput = GridTypesConsts::GridToMap(InMovementInput);
+	SetMapUVs(MapUVs + FixedInput / UVScale * WorldMapConsts::UVScaleMulti);
+	MyGridLoc = MapUVsToGridCoords(MapUVs);
 }
 
 void UWorldMap::SetMapUVs(const FVector2D& InMapUVs)

@@ -31,6 +31,7 @@ public:
 	
 	void Move(const FInputActionValue& InActionValue);
 	void GridMove(const FInputActionValue& InActionValue);
+	void OnDragMove(const FInputActionInstance& InputActionInstance);
 	void ControlGridPawn(const FInputActionValue& InActionValue);
 	void CommandMoveTo(const FInputActionValue& InActionValue);
 
@@ -45,6 +46,9 @@ public:
 	// Input Actions:
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IAMove;
+	
+	UPROPERTY(EditAnywhere, Category = Input)
+	UInputAction* IADragMove;
 	
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* IAGridMove;
@@ -76,6 +80,15 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = Camera)
 	float ZoomMax = 1300.f;
+	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float DragMove_BrakingFactor = 0.5f;
+	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float DragMove_ZeroOutThresh = 0.1f;
+	
+	UPROPERTY(EditAnywhere, Category = Camera)
+	float DragMove_Speed = 0.0009f;
 	
 	UPROPERTY(EditAnywhere, Category = Control)
 	float ControlledPawnInterpSpeed = 8.f;
@@ -109,4 +122,9 @@ private:
 	
 	// map is managed through zoom. we broadcast open, listen for close:
 	bool bIsWorldMapOpen = false;
+	
+	bool bIsDragMoveHeld = false;
+	
+	FVector2D DragMoveInput;
+	FVector2D LastMousePos_DragMoveInput;
 };

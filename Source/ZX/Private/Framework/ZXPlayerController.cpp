@@ -3,6 +3,8 @@
 #include "AbilitySystemComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "LandscapeEdgeFixup.h"
+#include "LandscapeEditTypes.h"
 #include "Core/ZXUtils.h"
 #include "Data/SkillSetData.h"
 #include "Kismet/GameplayStatics.h"
@@ -55,6 +57,26 @@ void AZXPlayerController::Tick(float DeltaSeconds)
 			MyPawn->SetActorLocation(FVector(LerpedLoc.X, LerpedLoc.Y, MyPawn->GetActorLocation().Z));
 		}
 	}
+	// respond to drag input: NOTE: else if
+	else if (DragMoveInput != FVector2D::ZeroVector)
+	{
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (IsValid(MyPawn))
+		{
+			const FVector CurrentLoc = MyPawn->GetActorLocation();
+			MyPawn->SetActorLocation(FVector(CurrentLoc.X + DragMoveInput.X, CurrentLoc.Y + DragMoveInput.Y, CurrentLoc.Z));
+		}
+		// Drag input has a braking force - we dont zero it out right now:
+		DragMoveInput *= DragMove_BrakingFactor;
+		if (FMath::Abs(DragMoveInput.X) < DragMove_ZeroOutThresh)
+		{
+			DragMoveInput.X = 0;
+		}
+		if (FMath::Abs(DragMoveInput.Y) < DragMove_ZeroOutThresh)
+		{
+			DragMoveInput.Y = 0;
+		}
+	}
 }
 
 void AZXPlayerController::OnPossess(APawn* InPawn)
@@ -102,6 +124,9 @@ void AZXPlayerController::SetupInputComponent()
 	EnhancedInputComp->BindAction(IACameraZoomIn, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomIn);
 	EnhancedInputComp->BindAction(IACameraZoomOut, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomOut);
 	EnhancedInputComp->BindAction(IAOpenMap, ETriggerEvent::Started,this, &AZXPlayerController::OnMapPressed);
+	
+	EnhancedInputComp->BindAction(IADragMove, ETriggerEvent::Triggered, this, &AZXPlayerController::OnDragMove);
+	EnhancedInputComp->BindAction(IADragMove, ETriggerEvent::Completed, this, &AZXPlayerController::OnDragMove);
 	
 	// Setup Mappings:
 	EnhancedInputSubsystem->ClearAllMappings();
@@ -161,6 +186,49 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 		{
 			const FVector NewWorldLoc = GridManager->CoordinatesToWorld(NewCoords);
 			MyPawn->SetActorLocation(FVector(NewWorldLoc.X, NewWorldLoc.Y, MyPawn->GetActorLocation().Z));
+		}
+	}
+}
+
+void AZXPlayerController::OnDragMove(const FInputActionInstance& InputActionInstance)
+{
+	// end the drag:
+	if (InputActionInstance.GetTriggerEvent() == ETriggerEvent::Completed)
+	{
+		bIsDragMoveHeld = false;
+	}
+	// start the drag:
+	else if (!bIsDragMoveHeld)
+	{
+		bIsDragMoveHeld = true;
+		float MouseX; float MouseY;
+		GetMousePosition(MouseX, MouseY);
+		LastMousePos_DragMoveInput = FVector2D(MouseX, MouseY);
+	}
+	// drag:
+	else
+	{
+		// calc input, and route it to either our pawn or the map:
+		float MouseX; float MouseY;
+		GetMousePosition(MouseX, MouseY);
+		const FVector2D NewMousePos = FVector2D(MouseX, MouseY);
+		const FVector2D LocalDragMoveInput = GridTypesConsts::GridToMap(NewMousePos - LastMousePos_DragMoveInput);
+		LastMousePos_DragMoveInput = NewMousePos;
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapDragMove.Broadcast(LocalDragMoveInput);
+			}
+		}
+		
+		// Pawn - but we cannot drag move if we are controlling a guy:
+		// TODO: maybe we allow a little dragging with a tether to controlled guy?
+		if (!bIsWorldMapOpen && !ControlledGridPawn.IsValid())
+		{
+			DragMoveInput = LocalDragMoveInput * CurrentZoom * DragMove_Speed;
 		}
 	}
 }
