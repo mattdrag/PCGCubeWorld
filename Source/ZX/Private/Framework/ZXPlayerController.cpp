@@ -90,20 +90,28 @@ void AZXPlayerController::SetupInputComponent()
 
 void AZXPlayerController::Move(const FInputActionValue& InActionValue)
 {
-	// we cannot move while map is open:
-	if (bIsWorldMapOpen)
-	{
-		return;
-	}
-	
 	// Move on 2D plane (no Z input rn)
 	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
-	AZXPawn* CameraPawn = UZXUtils::GetZXPawn(this);
-	if (!IsValid(CameraPawn))
+	
+	// Send input to Map:
+	if (bIsWorldMapOpen)
 	{
-		return;
+		if (IsValid(UIDelegates))
+		{
+			UIDelegates->OnMapMove.Broadcast(Input);
+		}
 	}
-	CameraPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), CameraPawn->MovementSpeed);
+	
+	// Send input to camera:
+	else
+	{
+		AZXPawn* CameraPawn = UZXUtils::GetZXPawn(this);
+		if (!IsValid(CameraPawn))
+		{
+			return;
+		}
+		CameraPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), CameraPawn->MovementSpeed);
+	}
 }
 
 void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)

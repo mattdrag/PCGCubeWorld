@@ -37,6 +37,7 @@ void UWorldMap::NativeOnInitialized()
 	{
 		UIDelegates->OnMapGenerationComplete.AddUObject(this, &ThisClass::HandleMapGenerationComplete);
 		UIDelegates->OnMapZoom.AddUObject(this, &ThisClass::HandleMapZoom);
+		UIDelegates->OnMapMove.AddUObject(this, &ThisClass::HandleMapMove);
 		UIDelegates->OnMapGridMove.AddUObject(this, &ThisClass::HandleMapGridMove);
 		
 		// Map listens for open, broadcasts close:
@@ -80,6 +81,7 @@ void UWorldMap::NativeDestruct()
 		UIDelegates->OnMapOpened.RemoveAll(this);
 		UIDelegates->OnMapGenerationComplete.RemoveAll(this);
 		UIDelegates->OnMapZoom.RemoveAll(this);
+		UIDelegates->OnMapMove.RemoveAll(this);
 		UIDelegates->OnMapGridMove.RemoveAll(this);
 	}
 	
@@ -194,9 +196,17 @@ void UWorldMap::HandleMapOpened(FVector InWorldLocation)
 	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
 }
 
-void UWorldMap::HandleMapGridMove(FIntPoint NewGridCoords)
+void UWorldMap::HandleMapMove(FVector2D InMovementInput)
 {
-	MyGridLoc += GridToMap(NewGridCoords);
+	const FIntPoint IntegerInput = FIntPoint(InMovementInput.X, InMovementInput.Y);
+	
+	// for now we are going tile by tile:
+	HandleMapGridMove(IntegerInput);
+}
+
+void UWorldMap::HandleMapGridMove(FIntPoint InMovementInput)
+{
+	MyGridLoc += GridToMap(InMovementInput);
 	SetMapUVs(GridCoordsToMapUVs(MyGridLoc));
 }
 

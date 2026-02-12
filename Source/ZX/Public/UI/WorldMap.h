@@ -33,8 +33,9 @@ protected:
 	// player zooms past camera max:
 	void HandleMapZoom(float ZoomInput);
 	
-	// Map grid movement
-	void HandleMapGridMove(FIntPoint NewGridCoords);
+	// Map movement - wasd + arrow keys
+	void HandleMapMove(FVector2D InMovementInput);
+	void HandleMapGridMove(FIntPoint InMovementInput);
 	
 	// called when grid manager has finished map gen:
 	void HandleMapGenerationComplete();

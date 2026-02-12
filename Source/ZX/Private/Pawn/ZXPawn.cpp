@@ -273,7 +273,11 @@ void AZXPawn::BufferCubes(const FIntPoint& OldLocation, const FIntPoint& NewLoca
 	// finish the window shift:
 	LoadedCubeWindow = LoadedCubeWindow.ShiftBy(FIntPoint(Diff.X, 0));
 	
-	LOGZXSCR("CubeBuffer_Load=%d | CubeBuffer_Unload=%d", CubeBuffer_Load.Num(), CubeBuffer_Unload.Num());
+	// TODO: remove this eventually..
+	if (CubeBuffer_Load.Num() != CubeBuffer_Unload.Num())
+	{
+		LOGZXSCR("WARNING: BUFFERS IMBALANCED! CubeBuffer_Load=%d | CubeBuffer_Unload=%d", CubeBuffer_Load.Num(), CubeBuffer_Unload.Num());
+	}
 }
 
 void AZXPawn::BufferLoad(int32 InIdx)
