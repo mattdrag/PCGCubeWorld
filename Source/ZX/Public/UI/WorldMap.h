@@ -20,12 +20,6 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
-	// Drag:
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
-	
 	// player hits the zoom threshold:
 	void HandleMapOpened(FVector InWorldLocation);
 	void CloseMap();
@@ -33,8 +27,10 @@ protected:
 	// player zooms past camera max:
 	void HandleMapZoom(float ZoomInput);
 	
-	// Map grid movement
-	void HandleMapGridMove(FIntPoint NewGridCoords);
+	// Map movement - wasd + arrow keys
+	void HandleMapMove(FVector2D InMovementInput);
+	void HandleMapGridMove(FIntPoint InMovementInput);
+	void HandleMapDragMove(FVector2D InMovementInput);
 	
 	// called when grid manager has finished map gen:
 	void HandleMapGenerationComplete();
@@ -96,8 +92,6 @@ private:
 	
 	float BaseZoom = 10.f;
 	
-	bool bIsDraggingMap = false;
-	FVector2D LastDragPos;
 	FVector2D MapUVs;
 	
 	FIntPoint GridMidpoint;

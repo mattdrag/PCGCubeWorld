@@ -3,6 +3,8 @@
 #include "AbilitySystemComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "LandscapeEdgeFixup.h"
+#include "LandscapeEditTypes.h"
 #include "Core/ZXUtils.h"
 #include "Data/SkillSetData.h"
 #include "Kismet/GameplayStatics.h"
@@ -33,6 +35,47 @@ void AZXPlayerController::BeginPlay()
 		{
 			bIsWorldMapOpen = false;
 		});
+	}
+}
+
+void AZXPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE(AZXPlayerController_Tick);
+	
+	// TODO: mouse hover:
+	
+	// Follow controlled pawn:
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
+	{
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (IsValid(MyPawn))
+		{
+			// Lerp MyPawn to ControlledPawn:
+			const FVector LerpedLoc = FMath::Lerp(MyPawn->GetActorLocation(), LocalControlledGridPawn->GetActorLocation(), DeltaSeconds * ControlledPawnInterpSpeed);
+			MyPawn->SetActorLocation(FVector(LerpedLoc.X, LerpedLoc.Y, MyPawn->GetActorLocation().Z));
+		}
+	}
+	// respond to drag input: NOTE: else if
+	else if (DragMoveInput != FVector2D::ZeroVector)
+	{
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (IsValid(MyPawn))
+		{
+			const FVector CurrentLoc = MyPawn->GetActorLocation();
+			MyPawn->SetActorLocation(FVector(CurrentLoc.X + DragMoveInput.X, CurrentLoc.Y + DragMoveInput.Y, CurrentLoc.Z));
+		}
+		// Drag input has a braking force - we dont zero it out right now:
+		DragMoveInput *= DragMove_BrakingFactor;
+		if (FMath::Abs(DragMoveInput.X) < DragMove_ZeroOutThresh)
+		{
+			DragMoveInput.X = 0;
+		}
+		if (FMath::Abs(DragMoveInput.Y) < DragMove_ZeroOutThresh)
+		{
+			DragMoveInput.Y = 0;
+		}
 	}
 }
 
@@ -76,12 +119,14 @@ void AZXPlayerController::SetupInputComponent()
 	// Bind Actions:
 	EnhancedInputComp->BindAction(IAMove, ETriggerEvent::Triggered, this, &AZXPlayerController::Move);
 	EnhancedInputComp->BindAction(IAGridMove, ETriggerEvent::Started, this, &AZXPlayerController::GridMove);
-	EnhancedInputComp->BindAction(IACameraFollow, ETriggerEvent::Completed, this, &ThisClass::FollowGridPawn);
-	EnhancedInputComp->BindAction(IACameraUnfollow, ETriggerEvent::Completed, this, &ThisClass::UnfollowGridPawn);
+	EnhancedInputComp->BindAction(IATakeControl, ETriggerEvent::Started, this, &ThisClass::ControlGridPawn);
 	EnhancedInputComp->BindAction(IACommandMoveTo, ETriggerEvent::Completed, this, &ThisClass::CommandMoveTo);
 	EnhancedInputComp->BindAction(IACameraZoomIn, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomIn);
 	EnhancedInputComp->BindAction(IACameraZoomOut, ETriggerEvent::Triggered, this, &AZXPlayerController::OnZoomOut);
 	EnhancedInputComp->BindAction(IAOpenMap, ETriggerEvent::Started,this, &AZXPlayerController::OnMapPressed);
+	
+	EnhancedInputComp->BindAction(IADragMove, ETriggerEvent::Triggered, this, &AZXPlayerController::OnDragMove);
+	EnhancedInputComp->BindAction(IADragMove, ETriggerEvent::Completed, this, &AZXPlayerController::OnDragMove);
 	
 	// Setup Mappings:
 	EnhancedInputSubsystem->ClearAllMappings();
@@ -90,20 +135,28 @@ void AZXPlayerController::SetupInputComponent()
 
 void AZXPlayerController::Move(const FInputActionValue& InActionValue)
 {
-	// we cannot move while map is open:
-	if (bIsWorldMapOpen)
-	{
-		return;
-	}
-	
 	// Move on 2D plane (no Z input rn)
 	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
-	AZXPawn* CameraPawn = UZXUtils::GetZXPawn(this);
-	if (!IsValid(CameraPawn))
+	
+	// Send input to Map:
+	if (bIsWorldMapOpen)
 	{
-		return;
+		if (IsValid(UIDelegates))
+		{
+			UIDelegates->OnMapMove.Broadcast(Input);
+		}
 	}
-	CameraPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), CameraPawn->MovementSpeed);
+	
+	// Send input to camera:
+	else
+	{
+		AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
+		if (!IsValid(MyPawn))
+		{
+			return;
+		}
+		MyPawn->AddMovementInput(FVector(Input.X, Input.Y, 0), MyPawn->MovementSpeed);
+	}
 }
 
 void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
@@ -112,7 +165,7 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 	const FVector2D Input = InActionValue.Get<FInputActionValue::Axis2D>();
 	const FIntPoint IntegerInput = FIntPoint(Input.X, Input.Y);
 	
-	AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+	AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
 	if (IsValid(MyPawn) && IsValid(GridManager))
 	{
@@ -137,40 +190,79 @@ void AZXPlayerController::GridMove(const FInputActionValue& InActionValue)
 	}
 }
 
-void AZXPlayerController::FollowGridPawn(const FInputActionValue& InActionValue)
+void AZXPlayerController::OnDragMove(const FInputActionInstance& InputActionInstance)
 {
-	// Toggle the check to follow the grid pawn
-
-	FHitResult Hit;
-	GetHitResultUnderCursorByChannel(SelectionTraceChannel, false, Hit);
-	AGridPawn* GPawn = Cast<AGridPawn>(Hit.GetActor());
-	if (!IsValid(GPawn))
+	// end the drag:
+	if (InputActionInstance.GetTriggerEvent() == ETriggerEvent::Completed)
 	{
-		UE_LOG(LogZX, Error, TEXT("Attempting to follow non gridpawn"));
-		return;
+		bIsDragMoveHeld = false;
 	}
-	SetCameraGridPawn(GPawn);
+	// start the drag:
+	else if (!bIsDragMoveHeld)
+	{
+		bIsDragMoveHeld = true;
+		float MouseX; float MouseY;
+		GetMousePosition(MouseX, MouseY);
+		LastMousePos_DragMoveInput = FVector2D(MouseX, MouseY);
+	}
+	// drag:
+	else
+	{
+		// calc input, and route it to either our pawn or the map:
+		float MouseX; float MouseY;
+		GetMousePosition(MouseX, MouseY);
+		const FVector2D NewMousePos = FVector2D(MouseX, MouseY);
+		const FVector2D LocalDragMoveInput = GridTypesConsts::GridToMap(NewMousePos - LastMousePos_DragMoveInput);
+		LastMousePos_DragMoveInput = NewMousePos;
+		
+		// Map:
+		if (bIsWorldMapOpen)
+		{
+			if (IsValid(UIDelegates))
+			{
+				UIDelegates->OnMapDragMove.Broadcast(LocalDragMoveInput);
+			}
+		}
+		
+		// Pawn - but we cannot drag move if we are controlling a guy:
+		// TODO: maybe we allow a little dragging with a tether to controlled guy?
+		if (!bIsWorldMapOpen && !ControlledGridPawn.IsValid())
+		{
+			DragMoveInput = LocalDragMoveInput * CurrentZoom * DragMove_Speed;
+		}
+	}
 }
 
-void AZXPlayerController::UnfollowGridPawn(const FInputActionValue& InActionValue)
+void AZXPlayerController::ControlGridPawn(const FInputActionValue& InActionValue)
 {
-	SetCameraGridPawn(nullptr);
+	// if we already control a guy, uncontrol him.
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
+	{
+		ControlGridPawn(nullptr);
+	}
+	
+	// Get pawns under cursor:
+	FHitResult Hit;
+	GetHitResultUnderCursorByChannel(SelectionTraceChannel, false, Hit);
+	AGridPawn* HitGridPawn = Cast<AGridPawn>(Hit.GetActor());
+	if (IsValid(HitGridPawn))
+	{
+		// control the hitres
+		ControlGridPawn(HitGridPawn);
+	}
 }
 
 void AZXPlayerController::CommandMoveTo(const FInputActionValue& InActionValue)
 {
-	// Tell brain of guy we are looking at where to go:
-
-	// are we looking at a guy?
-	if (AGridPawn* TheGuyWeAreLookingAt = GetCameraGridPawn())
+	if (AGridPawn* LocalControlledGridPawn = GetControlledGridPawn())
 	{
-		if (AGridPawnAIController* GPAIC = Cast<AGridPawnAIController>(TheGuyWeAreLookingAt->Controller))
+		if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(LocalControlledGridPawn->Controller))
 		{
 			// yes, hit scan for cube:
 			FHitResult Hit;
 			if (GetHitResultUnderCursorByChannel(CommandTraceChannel, false, Hit))
 			{
-				GPAIC->Command_MoveTo(Hit.Location);
+				AIC->Command_MoveTo(Hit.Location);
 			}
 		}
 	}
@@ -232,7 +324,7 @@ void AZXPlayerController::OnZoomOut()
 			if (TargetZoom > CurrentZoom)
 			{
 				bIsWorldMapOpen = true;
-				AZXPawn* MyPawn = UZXUtils::GetZXPawn(this);
+				AZXPawn* MyPawn = Cast<AZXPawn>(GetPawn());
 				if (IsValid(MyPawn) && IsValid(UIDelegates))
 				{
 					UIDelegates->OnMapOpened.Broadcast(MyPawn->GetActorLocation());
@@ -247,15 +339,31 @@ void AZXPlayerController::OnMapPressed()
 	// TODO: for now, only trigger map through zooming..
 }
 
-AGridPawn* AZXPlayerController::GetCameraGridPawn() const
+void AZXPlayerController::ControlGridPawn(AGridPawn* InPawn)
 {
-	return CameraFollowPawn;
-}
-
-AGridPawn* AZXPlayerController::SetCameraGridPawn(AGridPawn* GPawn)
-{
-	CameraFollowPawn = GPawn;
-	return CameraFollowPawn;
+	// gain control:
+	if (IsValid(InPawn))
+	{
+		if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(InPawn->Controller))
+		{
+			AIC->SetControlled(true);
+		}
+	}
+	
+	// lose control:
+	else
+	{
+		AGridPawn* PrevControlledPawn = ControlledGridPawn.Get();
+		if (IsValid(PrevControlledPawn))
+		{
+			if (AGridPawnAIController* AIC = Cast<AGridPawnAIController>(PrevControlledPawn->Controller))
+			{
+				AIC->SetControlled(false);
+			}
+		}
+	}
+	
+	ControlledGridPawn = InPawn;
 }
 
 void AZXPlayerController::DebugAttackEveryone()

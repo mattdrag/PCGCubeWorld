@@ -18,6 +18,12 @@ namespace GridTypesConsts
 		FIntPoint(-1,0),
 		FIntPoint(-1,1),
 	};
+	
+	FORCEINLINE FIntPoint GridToMap(const FIntPoint& InGridCoords) { return FIntPoint(InGridCoords.Y, -InGridCoords.X); }
+	FORCEINLINE FIntPoint MapToGrid(const FIntPoint& InMapCoords) { return FIntPoint(-InMapCoords.Y, InMapCoords.X); }
+	
+	FORCEINLINE FVector2D GridToMap(const FVector2D& InGridCoords) { return FVector2D(InGridCoords.Y, -InGridCoords.X); }
+	FORCEINLINE FVector2D MapToGrid(const FVector2D& InMapCoords) { return FVector2D(-InMapCoords.Y, InMapCoords.X); }
 }
 
 UENUM()

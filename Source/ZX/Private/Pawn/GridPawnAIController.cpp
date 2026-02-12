@@ -24,6 +24,20 @@ void AGridPawnAIController::BeginPlay()
 	StateTree->StartLogic();
 }
 
+void AGridPawnAIController::SetControlled(bool InControlled)
+{
+	bIsControlled = InControlled;
+	
+	if (!bIsControlled)
+	{
+		StateTree->ResumeLogic("No longer under control..");
+	}
+	else
+	{
+		StateTree->StopLogic("Under control..");
+	}
+}
+
 void AGridPawnAIController::Command_MoveTo(const FVector& NewLocation)
 {
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
@@ -33,13 +47,5 @@ void AGridPawnAIController::Command_MoveTo(const FVector& NewLocation)
 	}
 
 	const FVector GridLoc = GridManager->CoordinatesToWorld(GridManager->WorldToCoordinates(NewLocation));
-	MoveToLocation(GridLoc, 0.0001/4, false, false);
-
-	const AZXPawn* CameraPawn = UZXUtils::GetZXPawn(GetWorld());
-	if (!IsValid(CameraPawn))
-	{
-		return;
-	}
-	DrawDebugLine(GetWorld(), CameraPawn->GetActorLocation(), NewLocation, FColor::Red, false, 2);
-	DrawDebugSphere(GetWorld(), NewLocation, 5, 5, FColor::Blue, false, 2);
+	MoveToLocation(GridLoc, 0.0001, false, false);
 }
