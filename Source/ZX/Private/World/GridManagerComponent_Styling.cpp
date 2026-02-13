@@ -163,7 +163,7 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 			{
 				const FVector2D& FoliageUV = FoliageUVs[i];
 				const FVector CubeLoc = InCube->GetActorLocation();
-				const FVector FoliageLoc = FVector(CubeLoc.X + FoliageUV.X * CubeSize, CubeLoc.Y + FoliageUV.Y * CubeSize, CubeLoc.Z);
+				const FVector FoliageLoc = FVector(CubeLoc.X + FoliageUV.X * CubeSize/2, CubeLoc.Y + FoliageUV.Y * CubeSize/2, CubeLoc.Z);
 				SpawnFoliage(**CurrentBiome, FoliageLoc);
 			}
 		}
@@ -245,7 +245,7 @@ int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FV
 	{
 		// For some reason, -1.5, -1.5 will be bottom right, while 1.5, 1.5 will be top left.
 		// TODO: jitter. for now, completely randomize:
-		OutPoints.Add(FVector2D(FMath::FRandRange(-1.5, 1.5),FMath::FRandRange(-1.5, 1.5)));
+		OutPoints.Add(FVector2D(FMath::FRandRange(-1.f, 1.f),FMath::FRandRange(-1.f, 1.f)));
 	}
 
 	return NumFoliage;
