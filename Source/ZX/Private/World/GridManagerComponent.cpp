@@ -188,10 +188,6 @@ bool UGridManagerComponent::GenerateGridData()
 			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
 			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
 			NewTile.Biome = ChosenBiome;
-			
-			// this guy also gets some foliage potentially:
-			GenerateFoliageForGridCell(ChosenBiome, NewTile);
-			
 			GridTiles.Add(NewTile);
 		}
 	}
@@ -199,10 +195,21 @@ bool UGridManagerComponent::GenerateGridData()
 	return true;
 }
 
-void UGridManagerComponent::GenerateFoliageForGridCell(EBiome InBiomeType, FGridTile& InTile)
+bool UGridManagerComponent::GenerateFoliageData()
+{
+	for (FGridTile& GridTile : GridTiles)
+	{
+		// this guy also gets some foliage potentially:
+		GenerateFoliageForGridCell(GridTile);
+	}
+	
+	return true;
+}
+
+void UGridManagerComponent::GenerateFoliageForGridCell(FGridTile& InTile)
 {
 	// get biome:
-	TObjectPtr<UBiomeData>* InBiome = BiomeData.Find(InBiomeType);
+	TObjectPtr<UBiomeData>* InBiome = BiomeData.Find(InTile.Biome);
 	// NOTE: we technically dont need these checks, theyre done in validate right now..
 	if (InBiome == nullptr || !IsValid(*InBiome))
 	{
@@ -345,6 +352,11 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 		CellularAutomataStep();
 	}
 	
+	// 3. make foliage:
+	if (!GenerateFoliageData())
+	{
+		return false;
+	}
 
 	// Completed:
 	bIsDataGenerated = true;

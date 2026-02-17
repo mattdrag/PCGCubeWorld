@@ -59,7 +59,8 @@ public:
 	bool SpawnEntireGrid(int32 InSeed = 0, const FCellularAutomataOptions& InCAOptions = FCellularAutomataOptions());
 	bool ValidateGridData();
 	bool GenerateGridData();
-	void GenerateFoliageForGridCell(EBiome InBiomeType, FGridTile& InTile);
+	bool GenerateFoliageData();
+	void GenerateFoliageForGridCell(FGridTile& InTile);
 	void CellularAutomataStep();
 	bool DestroyGrid();
 	bool SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx = -1);

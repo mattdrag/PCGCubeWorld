@@ -49,6 +49,7 @@ enum class ETileType : uint8
 	Grass,
 	Sand,
 	Water,
+	Mountain,
 	
 	Count UMETA(Hidden)
 };
