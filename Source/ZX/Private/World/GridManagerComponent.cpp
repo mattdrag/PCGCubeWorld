@@ -222,25 +222,25 @@ void UGridManagerComponent::GenerateFoliageForGridCell(EBiome InBiomeType, FGrid
 	}
 	
 	// we can have between 0-8 foliage. split the range from LB -> UB into 8 discrete thresholds:
-	const float FoliageNumThresh = 8;
+	const float FoliageNumThresh = 4;
 	const float FoliageIncrementInterval = (FoliageLB - FoliageUB) / FoliageNumThresh;
 	
 	// now normalize this tiles altitude against it and LB:
-	const int32 NumFoliage =  (InTile.Altitude - FoliageUB) / FoliageIncrementInterval;
-	
-	for (int32 i = 0; i < NumFoliage; i++)
+	// TODO: for now, one foliage each..
+	const int32 NumFoliage =  FMath::Clamp((InTile.Altitude - FoliageUB) / FoliageIncrementInterval, 0, 1);
+	if (NumFoliage > 0)
 	{
-		// TODO: jitter. for now, completely randomize:
-		const float RandU = GridRandom.FRandRange(-1.f, 1.f);
-		const float RandV = GridRandom.FRandRange(-1.f, 1.f);
-		const FVector2D FoliageLoc = FVector2D(RandU * CubeSize/2, RandV * CubeSize/2);
-		
-		// Add inst:
-		// pick a random foliage for now:
-		// TODO: get random weighted index
-		const int32 FoliageIdx = FMath::RandRange(0, (*InBiome)->Foliage.Num() - 1);
-		UFoliageData* ChosenFoliage = (*InBiome)->Foliage[FoliageIdx];
-		InTile.FoliageInsts.Add(FFoliageInst(ChosenFoliage, FoliageLoc));
+		TArray<FVector2D> FoliageLocs;
+		GetJitteredGridForCell(NumFoliage, FoliageLocs);
+		for (const FVector2D& FoliageLoc : FoliageLocs)
+		{
+			// Add inst:
+			// pick a random foliage for now:
+			// TODO: get random weighted index
+			const int32 FoliageIdx = FoliageRandom.RandRange(0, (*InBiome)->Foliage.Num() - 1);
+			UFoliageData* ChosenFoliage = (*InBiome)->Foliage[FoliageIdx];
+			InTile.FoliageInsts.Add(FFoliageInst(ChosenFoliage, FoliageLoc));
+		}
 	}
 }
 
@@ -573,7 +573,7 @@ void UGridManagerComponent::ToggleGridDebugText(uint8 Mode)
  *  -> copy 99% of their code and add in seeding somewhere
  */
 
-namespace ZXPerlinHelpers
+namespace ZXNoiseHelpers
 {
 	// random permutation of 256 numbers, repeated 2x
 	static constexpr int32 NumPermutations = 512;
@@ -617,17 +617,27 @@ namespace ZXPerlinHelpers
 	{
 		return X * X * X * (X * (X * 6.0f - 15.0f) + 10.0f);
 	}
+	
+	static constexpr int32 NumFoliageSlots = 9;
+	static constexpr float FoliageCellDims = 3.f;
+	static const FIntPoint FoliageSlots[NumFoliageSlots] = 
+	{
+		FIntPoint(0,0), FIntPoint(0,1), FIntPoint(0,2),
+		FIntPoint(1,0), FIntPoint(1,1), FIntPoint(1,2),
+		FIntPoint(2,0), FIntPoint(2,1), FIntPoint(2,2)
+	};
 }
 
 void UGridManagerComponent::SetSeed(int32 InSeed)
 {
 	GridRandom.Initialize(InSeed);
+	FoliageRandom.Initialize(InSeed);
 	
 	// seed our perlin noise too:
-	ShuffledPermutation.Reset(512);
-	ShuffledPermutation.Append(ZXPerlinHelpers::Permutation);
+	ShuffledPermutation.Reset(ZXNoiseHelpers::NumPermutations);
+	ShuffledPermutation.Append(ZXNoiseHelpers::Permutation);
 	
-	const int32 LastIndex = ZXPerlinHelpers::NumPermutations - 1;	
+	const int32 LastIndex = ZXNoiseHelpers::NumPermutations - 1;	
 	for (int32 i = 0; i < LastIndex; ++i)
 	{
 		int32 Index = GridRandom.RandRange(0, LastIndex);
@@ -636,11 +646,15 @@ void UGridManagerComponent::SetSeed(int32 InSeed)
 			ShuffledPermutation.Swap(i, Index);
 		}
 	}
+	
+	// setup our foliage random:
+	ShuffledFoliageSlots.Reset();
+	ShuffledFoliageSlots.Append(ZXNoiseHelpers::FoliageSlots);
 }
 
 float UGridManagerComponent::PerlinNoiseZX(const FVector2D& Location)
 {
-	using namespace ZXPerlinHelpers;
+	using namespace ZXNoiseHelpers;
 
 	float Xfl = FMath::FloorToFloat((float)Location.X);		// LWC_TODO: Precision loss
 	float Yfl = FMath::FloorToFloat((float)Location.Y);
@@ -664,4 +678,46 @@ float UGridManagerComponent::PerlinNoiseZX(const FVector2D& Location)
 			FMath::Lerp(Grad2(ShuffledPermutation[AA], X, Y), Grad2(ShuffledPermutation[BA], Xm1, Y), U),
 			FMath::Lerp(Grad2(ShuffledPermutation[AB], X, Ym1), Grad2(ShuffledPermutation[BB], Xm1, Ym1), U),
 			V);
+}
+
+void UGridManagerComponent::GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints)
+{
+	// randomly pick foliage slots:
+	//  [][][]
+	//  [][][]
+	//  [][][]
+	
+	if (ShuffledFoliageSlots.Num() < NumPoints)
+	{
+		LOGZXEF("trying to access more foliage num than slots..");
+		return;
+	}
+	
+	const float FullCell = CubeSize / ZXNoiseHelpers::FoliageCellDims;
+	const float HalfCell = FullCell / 2.f;
+	
+	// shuffle the foliage slots:
+	for (int32 i = 0; i < ZXNoiseHelpers::NumFoliageSlots - 1; ++i)
+	{
+		int32 Index = FoliageRandom.RandRange(0, ZXNoiseHelpers::NumFoliageSlots - 1);
+		if (i != Index)
+		{
+			ShuffledFoliageSlots.Swap(i, Index);
+		}
+	}
+	
+	// place first N foliage, where N is numpoints off the front of the shuffle slots arr:
+	for (int32 i = 0; i < NumPoints; ++i)
+	{
+		// cell center:
+		const float CellCenterX = (ShuffledFoliageSlots[i].X * FullCell) + HalfCell - CubeSize / 2.f;
+		const float CellCenterY = (ShuffledFoliageSlots[i].Y * FullCell) + HalfCell - CubeSize / 2.f;
+
+		// jitter it:
+		const float MaxOffset = HalfCell * FoliageJitter;
+		const float OffsetX = FoliageRandom.FRandRange(-MaxOffset, MaxOffset);
+		const float OffsetY = FoliageRandom.FRandRange(-MaxOffset, MaxOffset);
+
+		OutPoints.Add(FVector2D(CellCenterX + OffsetX, CellCenterY + OffsetY));
+	}
 }

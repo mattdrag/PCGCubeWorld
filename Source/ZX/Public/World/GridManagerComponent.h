@@ -104,6 +104,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
 	float PerlinScalar = 0.01;
 	
+	UPROPERTY(EditDefaultsOnly, Category="Generation")
+	float FoliageJitter = 0.8f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
@@ -118,6 +121,7 @@ protected:
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
 	float PerlinNoiseZX(const FVector2D& Location);
+	void GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
 	TArray<uint8> BitmaskToTileStyle;
@@ -131,6 +135,7 @@ private:
 	TArray<FGridTile> GridTiles;
 	
 	FRandomStream GridRandom;
+	FRandomStream FoliageRandom;
 
 	FCellularAutomataOptions CellularAutomataOptions;
 	
@@ -138,6 +143,7 @@ private:
 	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
 	TArray<int32> ShuffledPermutation;
+	TArray<FIntPoint> ShuffledFoliageSlots;
 	
 	// TODO: change to an enum when grid generation is more complex
 	bool bIsDataGenerated = false;
