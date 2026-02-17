@@ -7,6 +7,7 @@
 #include "World/GridTypes.h"
 #include "BiomeData.generated.h"
 
+class UFoliageData;
 class UTileSetData;
 /**
  * 
@@ -36,10 +37,11 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
 	TArray<UTexture*> Grass;
-
+	
+	// todo: consider softobjectpath
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
-	TArray<UTexture*> Foliage;
-
+	TArray<UFoliageData*> Foliage;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = TileSet)
 	TArray<UTexture*> Water;
 

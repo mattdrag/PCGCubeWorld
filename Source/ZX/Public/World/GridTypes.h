@@ -3,6 +3,10 @@
 #include "CoreMinimal.h"
 #include "GridTypes.generated.h"
 
+class AFoliageSprite;
+struct FFoliageInst;
+class UFoliageData;
+class IGridEntityInterface;
 class AZXCube;
 
 namespace GridTypesConsts
@@ -95,6 +99,26 @@ enum class EBiome : uint8
 };
 ENUM_RANGE_BY_COUNT(EBiome, ETileType::Count);
 
+
+// associates foliage data with a location offset relative to grid cell center.
+USTRUCT(BlueprintType)
+struct FFoliageInst
+{
+	GENERATED_USTRUCT_BODY()
+
+	FFoliageInst() {}
+	
+	FFoliageInst(TObjectPtr<UFoliageData> InData, FVector2D Loc) 
+		: Data(InData), LocationOffset(Loc)
+	{}
+
+	FVector2D LocationOffset;
+	
+	// TODO: consider soft object path
+	UPROPERTY()
+	TObjectPtr<UFoliageData> Data;
+};
+
 /*
 **	Data for a grid tile
 */
@@ -126,6 +150,13 @@ struct FGridTile
 	
 	UPROPERTY(BlueprintReadOnly)
 	EBiome Biome = EBiome::TestGrasslands;
+	
+	// Foliage data:
+	UPROPERTY(BlueprintReadOnly, Category="Foliage")
+	TArray<FFoliageInst> FoliageInsts;
+	// spawned Foliage:
+	UPROPERTY(BlueprintReadOnly, Category="Foliage")
+	TArray<AFoliageSprite*> SpawnedFoliage;
 	
 	// weak ref to my actor in world
 	TWeakObjectPtr<AZXCube> MyCube;

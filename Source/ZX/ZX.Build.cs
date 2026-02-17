@@ -14,7 +14,8 @@ public class ZX : ModuleRules
 				"Core", "CoreUObject", "Engine",										// Core
 				"InputCore", "EnhancedInput", "CommonUI", "UMG", "Slate", "SlateCore",  // ui stuff
 				"AIModule", "StateTreeModule", "GameplayStateTreeModule",				// AI + state trees
-				"GameplayAbilities", "GameplayTasks", "GameplayTags"					// Gameplay Ability System
+				"GameplayAbilities", "GameplayTasks", "GameplayTags",					// Gameplay Ability System
+				"Paper2D"
 			});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

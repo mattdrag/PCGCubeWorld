@@ -11,6 +11,8 @@
 #include "GridManagerComponent.generated.h"
 
 
+class AFoliageSprite;
+class AZXSprite;
 class UBiomeData;
 
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -50,18 +52,21 @@ public:
 	FORCEINLINE int32 GetNumRows() const { return Rows; }
 	FORCEINLINE int32 GetNumColumns() const { return Columns; }
 	FORCEINLINE FIntPoint GetGridMidpoint() const { return FIntPoint(Rows/2, Columns/2); }
-	FORCEINLINE float GetZHeight() const { return CubeSize; }
+	FORCEINLINE float GetGridHeight() const { return GridHeight; }
 	
 	
 	// Grid Generation:
 	bool SpawnEntireGrid(int32 InSeed = 0, const FCellularAutomataOptions& InCAOptions = FCellularAutomataOptions());
+	bool ValidateGridData();
 	bool GenerateGridData();
+	void GenerateFoliageForGridCell(EBiome InBiomeType, FGridTile& InTile);
+	void CellularAutomataStep();
 	bool DestroyGrid();
 	bool SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx = -1);
 	void FreeCube(int32 InCubeIndex);
-	void FreeCube(const FGridTile& InTile);
-	void MarkCube(int32 InCubeIndex);
-	void CellularAutomataStep();
+	void FreeCube(FGridTile& InTile);
+	void SpawnFoliage(FGridTile& InTile);
+	void FreeFoliage(FGridTile& InTile);
 	
 	
 	// Places a guy on the grid:
@@ -99,8 +104,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
 	float PerlinScalar = 0.01;
 	
+	UPROPERTY(EditDefaultsOnly, Category="Generation")
+	float FoliageJitter = 0.8f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
+	
+	// TODO: we may expand on this concept with multiple grids..
+	float GridHeight = 0.f;
 	
 #pragma region Styling 
 	void LoadBiomes();
@@ -109,12 +120,14 @@ protected:
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
-	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
-
 	float PerlinNoiseZX(const FVector2D& Location);
+	void GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
 	TArray<uint8> BitmaskToTileStyle;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Styling")
+	TSubclassOf<AFoliageSprite> FoliageClass;
 #pragma endregion Styling
 	
 private:
@@ -122,6 +135,7 @@ private:
 	TArray<FGridTile> GridTiles;
 	
 	FRandomStream GridRandom;
+	FRandomStream FoliageRandom;
 
 	FCellularAutomataOptions CellularAutomataOptions;
 	
@@ -129,6 +143,7 @@ private:
 	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
 	TArray<int32> ShuffledPermutation;
+	TArray<FIntPoint> ShuffledFoliageSlots;
 	
 	// TODO: change to an enum when grid generation is more complex
 	bool bIsDataGenerated = false;

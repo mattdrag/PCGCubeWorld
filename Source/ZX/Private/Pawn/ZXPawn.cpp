@@ -43,7 +43,7 @@ void AZXPawn::BeginPlay()
 	}
 
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
-	if (!IsValid(GridManager))
+	if (!IsValid(GridManager) || !GridManager->IsGridGenerated())
 	{
 		LOGZXEF("Invalid GridManager..");
 		return;
@@ -57,7 +57,7 @@ void AZXPawn::BeginPlay()
 	
 	// start at zero vec:
 	SetActorRotation(FRotator::ZeroRotator);
-	SetActorLocation(FVector::ZeroVector + FVector(0.f, 0.f, GridManager->GetZHeight()));
+	SetActorLocation(FVector::ZeroVector + FVector(0.f, 0.f, GridManager->GetGridHeight()));
 	
 	// Load once:
 	LastGridLocation = GridManager->WorldToCoordinates(GetActorLocation());

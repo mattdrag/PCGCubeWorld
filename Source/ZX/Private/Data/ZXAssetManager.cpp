@@ -5,6 +5,7 @@
 
 const FPrimaryAssetType	UZXAssetManager::BiomeDataType = TEXT("Biome");
 const FPrimaryAssetType	UZXAssetManager::SkillSetType = TEXT("SkillSet");
+const FPrimaryAssetType	UZXAssetManager::FoliageDataType = TEXT("FoliageData");
 
 void UZXAssetManager::StartInitialLoading()
 {
