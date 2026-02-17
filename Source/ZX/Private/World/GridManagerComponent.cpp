@@ -16,15 +16,13 @@ namespace GridManagerConsts
 	const FName SpawnedFoliageFolder = FName("Foliage");
 }
 
-UGridManagerComponent::UGridManagerComponent()
-{
-}
-
 void UGridManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
 	SetSeed(GridSeed);
+	
+	FBMMode = static_cast<UE::Geometry::EFBMMode>(FBM_Mode);
 	
 	// We are responsible for styling tiles. at this point, we should tell the asset management system to load our styles:
 	LoadBiomes();
@@ -185,7 +183,7 @@ bool UGridManagerComponent::GenerateGridData()
 			
 			// Make a tile:
 			FGridTile NewTile(i * Columns + j);
-			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
+			NewTile.Altitude = UE::Geometry::FractalBrownianMotionNoise(FBMMode, FBM_Octaves, FVector2D(i + 0.5f,j + 0.5f) * FBM_Scalar, FBM_Lacunarity, FBM_Gain, FBM_Smoothness, FBM_Gamma);
 			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
 			NewTile.Biome = ChosenBiome;
 			GridTiles.Add(NewTile);
@@ -587,49 +585,6 @@ void UGridManagerComponent::ToggleGridDebugText(uint8 Mode)
 
 namespace ZXNoiseHelpers
 {
-	// random permutation of 256 numbers, repeated 2x
-	static constexpr int32 NumPermutations = 512;
-	static const int32 Permutation[NumPermutations] = {
-		63, 9, 212, 205, 31, 128, 72, 59, 137, 203, 195, 170, 181, 115, 165, 40, 116, 139, 175, 225, 132, 99, 222, 2, 41, 15, 197, 93, 169, 90, 228, 43, 221, 38, 206, 204, 73, 17, 97, 10, 96, 47, 32, 138, 136, 30, 219,
-		78, 224, 13, 193, 88, 134, 211, 7, 112, 176, 19, 106, 83, 75, 217, 85, 0, 98, 140, 229, 80, 118, 151, 117, 251, 103, 242, 81, 238, 172, 82, 110, 4, 227, 77, 243, 46, 12, 189, 34, 188, 200, 161, 68, 76, 171, 194,
-		57, 48, 247, 233, 51, 105, 5, 23, 42, 50, 216, 45, 239, 148, 249, 84, 70, 125, 108, 241, 62, 66, 64, 240, 173, 185, 250, 49, 6, 37, 26, 21, 244, 60, 223, 255, 16, 145, 27, 109, 58, 102, 142, 253, 120, 149, 160,
-		124, 156, 79, 186, 135, 127, 14, 121, 22, 65, 54, 153, 91, 213, 174, 24, 252, 131, 192, 190, 202, 208, 35, 94, 231, 56, 95, 183, 163, 111, 147, 25, 67, 36, 92, 236, 71, 166, 1, 187, 100, 130, 143, 237, 178, 158,
-		104, 184, 159, 177, 52, 214, 230, 119, 87, 114, 201, 179, 198, 3, 248, 182, 39, 11, 152, 196, 113, 20, 232, 69, 141, 207, 234, 53, 86, 180, 226, 74, 150, 218, 29, 133, 8, 44, 123, 28, 146, 89, 101, 154, 220, 126,
-		155, 122, 210, 168, 254, 162, 129, 33, 18, 209, 61, 191, 199, 157, 245, 55, 164, 167, 215, 246, 144, 107, 235, 
-
-		63, 9, 212, 205, 31, 128, 72, 59, 137, 203, 195, 170, 181, 115, 165, 40, 116, 139, 175, 225, 132, 99, 222, 2, 41, 15, 197, 93, 169, 90, 228, 43, 221, 38, 206, 204, 73, 17, 97, 10, 96, 47, 32, 138, 136, 30, 219,
-		78, 224, 13, 193, 88, 134, 211, 7, 112, 176, 19, 106, 83, 75, 217, 85, 0, 98, 140, 229, 80, 118, 151, 117, 251, 103, 242, 81, 238, 172, 82, 110, 4, 227, 77, 243, 46, 12, 189, 34, 188, 200, 161, 68, 76, 171, 194,
-		57, 48, 247, 233, 51, 105, 5, 23, 42, 50, 216, 45, 239, 148, 249, 84, 70, 125, 108, 241, 62, 66, 64, 240, 173, 185, 250, 49, 6, 37, 26, 21, 244, 60, 223, 255, 16, 145, 27, 109, 58, 102, 142, 253, 120, 149, 160,
-		124, 156, 79, 186, 135, 127, 14, 121, 22, 65, 54, 153, 91, 213, 174, 24, 252, 131, 192, 190, 202, 208, 35, 94, 231, 56, 95, 183, 163, 111, 147, 25, 67, 36, 92, 236, 71, 166, 1, 187, 100, 130, 143, 237, 178, 158,
-		104, 184, 159, 177, 52, 214, 230, 119, 87, 114, 201, 179, 198, 3, 248, 182, 39, 11, 152, 196, 113, 20, 232, 69, 141, 207, 234, 53, 86, 180, 226, 74, 150, 218, 29, 133, 8, 44, 123, 28, 146, 89, 101, 154, 220, 126,
-		155, 122, 210, 168, 254, 162, 129, 33, 18, 209, 61, 191, 199, 157, 245, 55, 164, 167, 215, 246, 144, 107, 235
-	};
-	
-	// Note: If you change the Grad2 or Grad3 functions, check that you don't change the range of the resulting noise as well; it should be (within floating point error) in the range of (-1, 1)
-	FORCEINLINE float Grad2(int32 Hash, float X, float Y)
-	{
-		// corners and major axes (similar to the z=0 projection of the cube-edge-midpoint sampling from improved Perlin noise)
-		switch (Hash & 7)
-		{
-		case 0: return X;
-		case 1: return X + Y;
-		case 2: return Y;
-		case 3: return -X + Y;
-		case 4: return -X;
-		case 5: return -X - Y;
-		case 6: return -Y;
-		case 7: return X - Y;
-		// can't happen
-		default: return 0;
-		}
-	}
-
-	// Curve w/ second derivative vanishing at 0 and 1, from Perlin's improved noise paper
-	FORCEINLINE float SmoothCurve(float X)
-	{
-		return X * X * X * (X * (X * 6.0f - 15.0f) + 10.0f);
-	}
-	
 	static constexpr int32 NumFoliageSlots = 9;
 	static constexpr float FoliageCellDims = 3.f;
 	static const FIntPoint FoliageSlots[NumFoliageSlots] = 
@@ -645,51 +600,9 @@ void UGridManagerComponent::SetSeed(int32 InSeed)
 	GridRandom.Initialize(InSeed);
 	FoliageRandom.Initialize(InSeed);
 	
-	// seed our perlin noise too:
-	ShuffledPermutation.Reset(ZXNoiseHelpers::NumPermutations);
-	ShuffledPermutation.Append(ZXNoiseHelpers::Permutation);
-	
-	const int32 LastIndex = ZXNoiseHelpers::NumPermutations - 1;	
-	for (int32 i = 0; i < LastIndex; ++i)
-	{
-		int32 Index = GridRandom.RandRange(0, LastIndex);
-		if (i != Index)
-		{
-			ShuffledPermutation.Swap(i, Index);
-		}
-	}
-	
 	// setup our foliage random:
 	ShuffledFoliageSlots.Reset();
 	ShuffledFoliageSlots.Append(ZXNoiseHelpers::FoliageSlots);
-}
-
-float UGridManagerComponent::PerlinNoiseZX(const FVector2D& Location)
-{
-	using namespace ZXNoiseHelpers;
-
-	float Xfl = FMath::FloorToFloat((float)Location.X);		// LWC_TODO: Precision loss
-	float Yfl = FMath::FloorToFloat((float)Location.Y);
-	int32 Xi = (int32)(Xfl) & 255;
-	int32 Yi = (int32)(Yfl) & 255;
-	float X = (float)Location.X - Xfl;
-	float Y = (float)Location.Y - Yfl;
-	float Xm1 = X - 1.0f;
-	float Ym1 = Y - 1.0f;
-	
-	int32 AA = ShuffledPermutation[Xi] + Yi;
-	int32 AB = AA + 1;
-	int32 BA = ShuffledPermutation[Xi + 1] + Yi;
-	int32 BB = BA + 1;
-
-	float U = SmoothCurve(X);
-	float V = SmoothCurve(Y);
-
-	// Note: Due to the choice of Grad2, this will be in the (-1,1) range with no additional scaling
-	return FMath::Lerp(
-			FMath::Lerp(Grad2(ShuffledPermutation[AA], X, Y), Grad2(ShuffledPermutation[BA], Xm1, Y), U),
-			FMath::Lerp(Grad2(ShuffledPermutation[AB], X, Ym1), Grad2(ShuffledPermutation[BB], Xm1, Ym1), U),
-			V);
 }
 
 void UGridManagerComponent::GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints)

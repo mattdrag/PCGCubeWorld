@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "Core/ZX.h"
 #include "GridTypes.h"
+#include "ProceduralNoise.h"
 #include "Pawn/GridPawn.h"
 #include "Pawn/ZXPawn.h"
 #include "World/ZXCube.h"
@@ -22,7 +23,6 @@ class ZX_API UGridManagerComponent : public UActorComponent
 
 public:
 	// initialization:
-	UGridManagerComponent();
 	void InitData();
 	void SetSeed(int32 InSeed);
 	
@@ -101,13 +101,37 @@ protected:
 	// for now load radius needs to be (Load_Radius*2 + 1) % 3 = 0
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 Load_Radius = 7;
-
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
-	float PerlinScalar = 0.01;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	float FoliageJitter = 0.8f;
+	
+	// 0 == standard, 1 == turbulent, 2 == ridge
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM", meta=(ClampMin="0", ClampMax="2", UIMin="0", UIMax="2"))
+	uint8 FBM_Mode = 0;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
+	float FBM_Scalar = 0.01;
+	
+	// the number of layers of noise
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
+	uint32 FBM_Octaves = 8;
 
+	// how quickly the frequency increases between successive layers (octaves) of noise
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
+	double FBM_Lacunarity = 2.0;
+	
+	// how much the amplitude diminishes for each successive octave
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
+	double FBM_Gain = 0.5;
+	
+	// smoothness amount to apply to turbulent and ridge modes
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
+	double FBM_Smoothness = 0.5;
+	
+	//< gamma to apply to turbulent and ridge
+	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
+	double FBM_Gamma = 0.5;
+	
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
@@ -143,8 +167,9 @@ private:
 	UPROPERTY()
 	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
-	TArray<int32> ShuffledPermutation;
 	TArray<FIntPoint> ShuffledFoliageSlots;
+	
+	UE::Geometry::EFBMMode FBMMode;
 	
 	// TODO: change to an enum when grid generation is more complex
 	bool bIsDataGenerated = false;
