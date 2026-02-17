@@ -6,11 +6,14 @@
 #include "Pawn/GridPawnAIController.h"
 #include "World/ZXCube.h"
 #include "Core/ZXUtils.h"
+#include "Data/BiomeData.h"
+#include "Data/FoliageData.h"
+#include "World/FoliageSprite.h"
 
 namespace GridManagerConsts
 {
 	const FName SpawnedCubeFolder = FName("GridCubes");
-	const FName SpawnedPoolCubeFolder = FName("PoolCubes");
+	const FName SpawnedFoliageFolder = FName("Foliage");
 }
 
 UGridManagerComponent::UGridManagerComponent()
@@ -185,11 +188,60 @@ bool UGridManagerComponent::GenerateGridData()
 			NewTile.Altitude = PerlinNoiseZX(FVector2D(i + 0.5f,j + 0.5f) * PerlinScalar);
 			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
 			NewTile.Biome = ChosenBiome;
+			
+			// this guy also gets some foliage potentially:
+			GenerateFoliageForGridCell(ChosenBiome, NewTile);
+			
 			GridTiles.Add(NewTile);
 		}
 	}
 
 	return true;
+}
+
+void UGridManagerComponent::GenerateFoliageForGridCell(EBiome InBiomeType, FGridTile& InTile)
+{
+	// get biome:
+	TObjectPtr<UBiomeData>* InBiome = BiomeData.Find(InBiomeType);
+	// NOTE: we technically dont need these checks, theyre done in validate right now..
+	if (InBiome == nullptr || !IsValid(*InBiome))
+	{
+		return;
+	}
+	if ((*InBiome)->Foliage.IsEmpty())
+	{
+		return;
+	}
+	
+	//  - NOTE: since we are styling on 1 dim, highes Altitude will have most foliage for now:
+	const float FoliageLB = -1.f; // TODO: altitude curve
+	const float FoliageUB = -0.3f;
+	if (InTile.Altitude >= FoliageUB)
+	{
+		return;
+	}
+	
+	// we can have between 0-8 foliage. split the range from LB -> UB into 8 discrete thresholds:
+	const float FoliageNumThresh = 8;
+	const float FoliageIncrementInterval = (FoliageLB - FoliageUB) / FoliageNumThresh;
+	
+	// now normalize this tiles altitude against it and LB:
+	const int32 NumFoliage =  (InTile.Altitude - FoliageUB) / FoliageIncrementInterval;
+	
+	for (int32 i = 0; i < NumFoliage; i++)
+	{
+		// TODO: jitter. for now, completely randomize:
+		const float RandU = GridRandom.FRandRange(-1.f, 1.f);
+		const float RandV = GridRandom.FRandRange(-1.f, 1.f);
+		const FVector2D FoliageLoc = FVector2D(RandU * CubeSize/2, RandV * CubeSize/2);
+		
+		// Add inst:
+		// pick a random foliage for now:
+		// TODO: get random weighted index
+		const int32 FoliageIdx = FMath::RandRange(0, (*InBiome)->Foliage.Num() - 1);
+		UFoliageData* ChosenFoliage = (*InBiome)->Foliage[FoliageIdx];
+		InTile.FoliageInsts.Add(FFoliageInst(ChosenFoliage, FoliageLoc));
+	}
 }
 
 void UGridManagerComponent::CellularAutomataStep()
@@ -275,6 +327,12 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 	SetSeed(InSeed);
 	CellularAutomataOptions = InCAOptions;
 	
+	// 0.6 Validate data:
+	if (!ValidateGridData())
+	{
+		return false;
+	}
+	
 	// 1. Make data
 	if (!GenerateGridData())
 	{
@@ -298,6 +356,26 @@ bool UGridManagerComponent::SpawnEntireGrid(int32 InSeed, const FCellularAutomat
 	return true;
 }
 
+bool UGridManagerComponent::ValidateGridData()
+{
+	// todo: theres only one biome right now..
+	const EBiome ChosenBiome = EBiome::TestGrasslands;
+	
+	TObjectPtr<UBiomeData>* InBiome = BiomeData.Find(ChosenBiome);
+	if (InBiome == nullptr || !IsValid(*InBiome))
+	{
+		LOGZXEF("CurrentBiome configured incorrectly");
+		return false;
+	}
+	if ((*InBiome)->Foliage.IsEmpty())
+	{
+		LOGZXEF("Biome %s has no foliage..", *(*InBiome)->DisplayName.ToString());
+		return false;
+	}
+	
+	return true;
+}
+
 void UGridManagerComponent::FreeCube(int32 InCubeIndex)
 {
 	if (!GridTiles.IsValidIndex(InCubeIndex))
@@ -309,28 +387,73 @@ void UGridManagerComponent::FreeCube(int32 InCubeIndex)
 	FreeCube(GridTiles[InCubeIndex]);
 }
 
-void UGridManagerComponent::FreeCube(const FGridTile& InTile)
+void UGridManagerComponent::FreeCube(FGridTile& InTile)
 {
 	// md todo: pool
 	if (AZXCube* ValidCube = InTile.MyCube.Get())
 	{
 		ValidCube->Destroy();
 	}
+	
+	// remove foliage:
+	FreeFoliage(InTile);
 }
 
-void UGridManagerComponent::MarkCube(int32 InCubeIndex)
+void UGridManagerComponent::SpawnFoliage(FGridTile& InTile)
 {
-	if (!GridTiles.IsValidIndex(InCubeIndex))
+	// md todo: grab from pool
+	
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
 	{
-		LOGZXEF("invalid idx %d..", InCubeIndex);
 		return;
 	}
-	const FGridTile& InTile = GridTiles[InCubeIndex];
-
-	if (AZXCube* ValidCube = InTile.MyCube.Get())
+	
+	// destroy any foliage that is already there..
+	if (!InTile.SpawnedFoliage.IsEmpty())
 	{
-		ValidCube->Destroy();
+		LOGZXWF("spawning cube %d already has foliage.. destroying it first..", InTile.MyIndex);
+		FreeFoliage(InTile);
 	}
+	
+	// for each inst (loc + data), spawn a foliage:
+	for (const FFoliageInst& FoliageInst : InTile.FoliageInsts)
+	{
+		// we need valid data to spawn it:
+		if (!IsValid(FoliageInst.Data))
+		{
+			LOGZXWF("Failed to spawn foliage for tile (%d) - data invalid.", InTile.MyIndex);
+			continue;
+		}
+		
+		AFoliageSprite* FoliageSprite = World->SpawnActor<AFoliageSprite>(FoliageClass, IndexToWorld(InTile.MyIndex) + FVector(FoliageInst.LocationOffset.X, FoliageInst.LocationOffset.Y, 0.f), FRotator::ZeroRotator);
+		if (!IsValid(FoliageSprite))
+		{
+			LOGZXWF("Failed to spawn foliage (%d)", InTile.MyIndex);
+			return;
+		}
+		
+		// set up data:
+		FoliageSprite->SetFolderPath(GridManagerConsts::SpawnedFoliageFolder);
+		FoliageSprite->SetData(*FoliageInst.Data, InTile.MyIndex);
+		
+		// add ref:
+		InTile.SpawnedFoliage.Add(FoliageSprite);
+	}
+}
+
+void UGridManagerComponent::FreeFoliage(FGridTile& InTile)
+{
+	// md todo: pool
+	
+	// destroy all spawned foliage:
+	for (AFoliageSprite* SpawnedFoliage : InTile.SpawnedFoliage)
+	{
+		SpawnedFoliage->Destroy();
+	}
+	
+	// remove all refs:
+	InTile.SpawnedFoliage.Empty();
 }
 
 bool UGridManagerComponent::SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx)
@@ -360,6 +483,10 @@ bool UGridManagerComponent::SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx)
 	// Swap:
 	if (OptionalSwapIdx != -1 && GridTiles.IsValidIndex(OptionalSwapIdx) && GridTiles[OptionalSwapIdx].MyCube.IsValid())
 	{
+		// we need to remove foliage and remake afterwards:
+		FreeFoliage(*GridTile);
+		
+		// perform the swap:
 		SpawnedCube = GridTiles[OptionalSwapIdx].MyCube.Get();
 		GridTiles[OptionalSwapIdx].MyCube = nullptr;
 		SpawnedCube->SetActorLocation(IndexToWorld(InCubeIndex));
@@ -383,9 +510,11 @@ bool UGridManagerComponent::SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx)
 
 	// style it:
 	StyleCube(SpawnedCube);
-		
+	
 	// set up a weak reference for our data to ref our in world actor:
 	GridTile->MyCube = SpawnedCube;
+	
+	SpawnFoliage(*GridTile);
 	
 	return true;
 }

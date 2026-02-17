@@ -22,4 +22,5 @@ public:
 	/** Static types */
 	static const FPrimaryAssetType BiomeDataType;
 	static const FPrimaryAssetType SkillSetType;
+	static const FPrimaryAssetType FoliageDataType;
 };

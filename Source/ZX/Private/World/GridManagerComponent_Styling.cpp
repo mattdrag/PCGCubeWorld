@@ -1,6 +1,7 @@
 ﻿#include "Core/ZXUtils.h"
 #include "Data/BiomeData.h"
 #include "Data/ZXAssetManager.h"
+#include "World/FoliageSprite.h"
 #include "World/GridTypes.h"
 #include "World/GridManagerComponent.h"
 #include "World/ZXCube.h"
@@ -62,38 +63,6 @@ ETileType UGridManagerComponent::DetermineTileType(EBiome InBiome, float InAltit
 	return (*CurrentBiome)->TileTypeConfig.BaseType;
 }
 
-void UGridManagerComponent::SpawnFoliage(const UBiomeData& InBiome, const FVector& InWorldLoc)
-{
-	UWorld* World = GetWorld();
-	if (!IsValid(World))
-	{
-		return;
-	}
-	const int32 FoliageIdx = FMath::RandRange(0, InBiome.Foliage.Num() - 1);
-	if (InBiome.Foliage.IsEmpty() || !InBiome.Foliage.IsValidIndex(FoliageIdx))
-	{
-		LOGZXWF("Biome %s has no foliage..", *InBiome.DisplayName.ToString());
-		return;
-	}
-	
-	// TODO: get random weighted index
-		
-	// Spawn a foliage sprite at location:
-	AZXSprite* SpawnedFoliage = World->SpawnActor<AZXSprite>(FoliageClass, InWorldLoc, FRotator::ZeroRotator);
-	
-	// Spawn:
-	if (!IsValid(SpawnedFoliage))
-	{
-		LOGZXWF("Failed to spawn foliage (%f,%f,%f)", InWorldLoc.X, InWorldLoc.Y, InWorldLoc.Z);
-		return;
-	}
-
-	// Put it in a folder for easier viewing of world outliner:
-	SpawnedFoliage->SetFolderPath(GridManagerStylingConsts::SpawnedFoliageFolder);
-	
-	SpawnedFoliage->SetSprite(InBiome.Foliage[FoliageIdx]);
-}
-
 void UGridManagerComponent::StyleCube(AZXCube* InCube)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UGridManagerComponent_StyleCube);
@@ -144,28 +113,6 @@ void UGridManagerComponent::StyleCube(AZXCube* InCube)
 		if ((*CurrentBiome)->Grass.IsValidIndex(TileSheetIndex))
 		{
 			DynCubeMat->SetTextureParameterValue("GrassTexture", (*CurrentBiome)->Grass[TileSheetIndex]);
-		}
-		
-		// Foliage
-		//  - NOTE: since we are styling on 1 dim, highes Altitude will have most foliage for now:
-		const float FoliageLB = -1.f; // TODO: altitude curve
-		const float FoliageUB = -0.3f;
-		if (InTile->Altitude < FoliageUB)
-		{
-			TArray<FVector2D> FoliageUVs;
-			GetJitteredGridForTile(InTile, FoliageUVs, FoliageLB, FoliageUB);
-	
-			// we only have so many foliage slots:
-			const int32 NumFoliage = FMath::Clamp(FoliageUVs.Num(), 0, GridManagerStylingConsts::NumFoliageSlots);
-	
-			// plant foliage for each of the slots:
-			for (int32 i = 0; i < NumFoliage; i++)
-			{
-				const FVector2D& FoliageUV = FoliageUVs[i];
-				const FVector CubeLoc = InCube->GetActorLocation();
-				const FVector FoliageLoc = FVector(CubeLoc.X + FoliageUV.X * CubeSize/2, CubeLoc.Y + FoliageUV.Y * CubeSize/2, CubeLoc.Z);
-				SpawnFoliage(**CurrentBiome, FoliageLoc);
-			}
 		}
 		
 		// Grass shading:
@@ -223,32 +170,6 @@ bool UGridManagerComponent::HasAnyNeighborsOfType(ETileType InType, const FIntPo
 		}
 	}
 	return false;
-}
-
-int32 UGridManagerComponent::GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB)
-{
-	// NOTE: we already passed the foliage check.
-	
-	// check intile anyway:
-	if (InTile == nullptr)
-	{
-		return 0;
-	}
-	
-	// we can have between 0-8 foliage. split the range from LB -> UB into 8 discrete thresholds:
-	const float FoliageIncrementInterval = (FoliageLB - FoliageUB) / 8;
-	
-	// now normalize this tiles altitude against it and LB:
-	const int32 NumFoliage =  (InTile->Altitude - FoliageUB) / FoliageIncrementInterval;
-	
-	for (int32 i = 0; i < NumFoliage; i++)
-	{
-		// For some reason, -1.5, -1.5 will be bottom right, while 1.5, 1.5 will be top left.
-		// TODO: jitter. for now, completely randomize:
-		OutPoints.Add(FVector2D(FMath::FRandRange(-1.f, 1.f),FMath::FRandRange(-1.f, 1.f)));
-	}
-
-	return NumFoliage;
 }
 
 FColor UGridManagerComponent::GetColorForMapTile(int32 InIdx)

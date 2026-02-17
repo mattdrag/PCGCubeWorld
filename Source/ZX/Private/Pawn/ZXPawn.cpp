@@ -43,7 +43,7 @@ void AZXPawn::BeginPlay()
 	}
 
 	UGridManagerComponent* GridManager = UZXUtils::GetGridManager(this);
-	if (!IsValid(GridManager))
+	if (!IsValid(GridManager) || !GridManager->IsGridGenerated())
 	{
 		LOGZXEF("Invalid GridManager..");
 		return;

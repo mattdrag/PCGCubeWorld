@@ -11,6 +11,7 @@
 #include "GridManagerComponent.generated.h"
 
 
+class AFoliageSprite;
 class AZXSprite;
 class UBiomeData;
 
@@ -56,13 +57,16 @@ public:
 	
 	// Grid Generation:
 	bool SpawnEntireGrid(int32 InSeed = 0, const FCellularAutomataOptions& InCAOptions = FCellularAutomataOptions());
+	bool ValidateGridData();
 	bool GenerateGridData();
+	void GenerateFoliageForGridCell(EBiome InBiomeType, FGridTile& InTile);
+	void CellularAutomataStep();
 	bool DestroyGrid();
 	bool SpawnCube(int32 InCubeIndex, int32 OptionalSwapIdx = -1);
 	void FreeCube(int32 InCubeIndex);
-	void FreeCube(const FGridTile& InTile);
-	void MarkCube(int32 InCubeIndex);
-	void CellularAutomataStep();
+	void FreeCube(FGridTile& InTile);
+	void SpawnFoliage(FGridTile& InTile);
+	void FreeFoliage(FGridTile& InTile);
 	
 	
 	// Places a guy on the grid:
@@ -113,16 +117,13 @@ protected:
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
-	void SpawnFoliage(const UBiomeData& InBiome, const FVector& InWorldLoc);
-	int32 GetJitteredGridForTile(FGridTile* InTile, TArray<FVector2D>& OutPoints, float FoliageLB, float FoliageUB);
-
 	float PerlinNoiseZX(const FVector2D& Location);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
 	TArray<uint8> BitmaskToTileStyle;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
-	TSubclassOf<AZXSprite> FoliageClass;
+	TSubclassOf<AFoliageSprite> FoliageClass;
 #pragma endregion Styling
 	
 private:
