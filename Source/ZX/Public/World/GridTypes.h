@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "ProceduralNoise.h"
 #include "GridTypes.generated.h"
 
 class AFoliageSprite;
@@ -172,4 +173,48 @@ struct FCellularAutomataOptions
 
 	UPROPERTY(EditAnywhere)
 	int32 NumIterations = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FFBMOptions
+{
+	GENERATED_USTRUCT_BODY()
+
+	FFBMOptions()
+	{}
+
+	// 0 == standard, 1 == turbulent, 2 == ridge
+	// - set ui only mode, then use GetMode at runtime.
+	UPROPERTY(EditDefaultsOnly, Category="FBM", meta=(ClampMin="0", ClampMax="2", UIMin="0", UIMax="2"))
+	uint8 UIOnlyMode = 0;
+	UE::Geometry::EFBMMode GetMode(){ return static_cast<UE::Geometry::EFBMMode>(UIOnlyMode); }
+	
+	UPROPERTY(EditDefaultsOnly, Category="FBM", meta = (ClampMin=0,ClampMax=10))
+	float Scalar = 0.01;
+	
+	// the number of layers of noise
+	UPROPERTY(EditDefaultsOnly, Category="FBM")
+	uint32 Octaves = 8;
+
+	// how quickly the frequency increases between successive layers (octaves) of noise
+	UPROPERTY(EditDefaultsOnly, Category="FBM")
+	double Lacunarity = 2.0;
+	
+	// how much the amplitude diminishes for each successive octave
+	UPROPERTY(EditDefaultsOnly, Category="FBM")
+	double Gain = 0.5;
+	
+	// smoothness amount to apply to turbulent and ridge modes
+	UPROPERTY(EditDefaultsOnly, Category="FBM")
+	double Smoothness = 0.5;
+	
+	// gamma to apply to turbulent and ridge
+	UPROPERTY(EditDefaultsOnly, Category="FBM")
+	double Gamma = 0.5;
+	
+	UPROPERTY(EditDefaultsOnly, Category="DomainWarping")
+	bool bUseDomainWarping = true;
+	
+	UPROPERTY(EditDefaultsOnly, Category="DomainWarping")
+	FVector2D WarpDomain = FVector2D(4.6,1.7);
 };

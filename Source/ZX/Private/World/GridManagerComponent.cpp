@@ -22,8 +22,6 @@ void UGridManagerComponent::BeginPlay()
 	
 	SetSeed(GridSeed);
 	
-	FBMMode = static_cast<UE::Geometry::EFBMMode>(FBM_Mode);
-	
 	// We are responsible for styling tiles. at this point, we should tell the asset management system to load our styles:
 	LoadBiomes();
 }
@@ -183,7 +181,19 @@ bool UGridManagerComponent::GenerateGridData()
 			
 			// Make a tile:
 			FGridTile NewTile(i * Columns + j);
-			NewTile.Altitude = UE::Geometry::FractalBrownianMotionNoise(FBMMode, FBM_Octaves, FVector2D(i + 0.5f,j + 0.5f) * FBM_Scalar, FBM_Lacunarity, FBM_Gain, FBM_Smoothness, FBM_Gamma);
+			
+			// if we wanna use domain warping, we need additional fbms:
+			const double FBM1 = UE::Geometry::FractalBrownianMotionNoise(FBMOptions.GetMode(), FBMOptions.Octaves, FVector2D(i + 0.5f,j + 0.5f) * FBMOptions.Scalar, FBMOptions.Lacunarity, FBMOptions.Gain, FBMOptions.Smoothness, FBMOptions.Gamma);
+			if (FBMOptions.bUseDomainWarping)
+			{
+				const double FBM2 = UE::Geometry::FractalBrownianMotionNoise(FBMOptions.GetMode(), FBMOptions.Octaves, (FVector2D(i + 0.5f,j + 0.5f) + FBMOptions.WarpDomain) * FBMOptions.Scalar, FBMOptions.Lacunarity, FBMOptions.Gain, FBMOptions.Smoothness, FBMOptions.Gamma);
+				NewTile.Altitude = UE::Geometry::FractalBrownianMotionNoise(FBMOptions.GetMode(), FBMOptions.Octaves, FVector2D(FBM1, FBM2), FBMOptions.Lacunarity, FBMOptions.Gain, FBMOptions.Smoothness, FBMOptions.Gamma);
+			}
+			else
+			{
+				NewTile.Altitude = FBM1;
+			}
+			
 			NewTile.Type = DetermineTileType(ChosenBiome, NewTile.Altitude); 
 			NewTile.Biome = ChosenBiome;
 			GridTiles.Add(NewTile);

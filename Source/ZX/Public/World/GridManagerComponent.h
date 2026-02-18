@@ -105,32 +105,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	float FoliageJitter = 0.8f;
 	
-	// 0 == standard, 1 == turbulent, 2 == ridge
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM", meta=(ClampMin="0", ClampMax="2", UIMin="0", UIMax="2"))
-	uint8 FBM_Mode = 0;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
-	float FBM_Scalar = 0.01;
-	
-	// the number of layers of noise
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
-	uint32 FBM_Octaves = 8;
-
-	// how quickly the frequency increases between successive layers (octaves) of noise
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
-	double FBM_Lacunarity = 2.0;
-	
-	// how much the amplitude diminishes for each successive octave
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
-	double FBM_Gain = 0.5;
-	
-	// smoothness amount to apply to turbulent and ridge modes
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
-	double FBM_Smoothness = 0.5;
-	
-	//< gamma to apply to turbulent and ridge
-	UPROPERTY(EditDefaultsOnly, Category="Generation|FBM")
-	double FBM_Gamma = 0.5;
+	UPROPERTY(EditDefaultsOnly, Category="Generation")
+	FFBMOptions FBMOptions;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
@@ -145,7 +121,6 @@ protected:
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
-	float PerlinNoiseZX(const FVector2D& Location);
 	void GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
@@ -168,8 +143,6 @@ private:
 	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
 	TArray<FIntPoint> ShuffledFoliageSlots;
-	
-	UE::Geometry::EFBMMode FBMMode;
 	
 	// TODO: change to an enum when grid generation is more complex
 	bool bIsDataGenerated = false;
