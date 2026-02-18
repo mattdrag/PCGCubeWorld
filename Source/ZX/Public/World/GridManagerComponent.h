@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "Core/ZX.h"
 #include "GridTypes.h"
+#include "ProceduralNoise.h"
 #include "Pawn/GridPawn.h"
 #include "Pawn/ZXPawn.h"
 #include "World/ZXCube.h"
@@ -22,7 +23,6 @@ class ZX_API UGridManagerComponent : public UActorComponent
 
 public:
 	// initialization:
-	UGridManagerComponent();
 	void InitData();
 	void SetSeed(int32 InSeed);
 	
@@ -101,13 +101,13 @@ protected:
 	// for now load radius needs to be (Load_Radius*2 + 1) % 3 = 0
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	int32 Load_Radius = 7;
-
-	UPROPERTY(EditDefaultsOnly, Category="Generation", meta = (ClampMin=0,ClampMax=10))
-	float PerlinScalar = 0.01;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Generation")
 	float FoliageJitter = 0.8f;
-
+	
+	UPROPERTY(EditDefaultsOnly, Category="Generation")
+	FFBMOptions FBMOptions;
+	
 	UPROPERTY(EditDefaultsOnly, Category="Cubes")
 	TSubclassOf<AZXCube> CubeClass;
 	
@@ -121,7 +121,6 @@ protected:
 	uint8 Autotile(ETileType InType, const FIntPoint& InCoord);
 	bool HasAnyNeighborsOfType(ETileType InType, const FIntPoint& InCoord);
 
-	float PerlinNoiseZX(const FVector2D& Location);
 	void GetJitteredGridForCell(int32 NumPoints, TArray<FVector2D>& OutPoints);
 	
 	UPROPERTY(EditDefaultsOnly, Category="Styling")
@@ -143,7 +142,6 @@ private:
 	UPROPERTY()
 	TMap<EBiome, TObjectPtr<UBiomeData>> BiomeData;
 	
-	TArray<int32> ShuffledPermutation;
 	TArray<FIntPoint> ShuffledFoliageSlots;
 	
 	// TODO: change to an enum when grid generation is more complex
